@@ -58,9 +58,58 @@ export const validateSendContact = validate(Joi.object({
 export const validateSetTyping = validate(Joi.object({
     sessionId: sessionIdSchema,
     to: phoneSchema,
-    state: Joi.string().valid('composing', 'recording', 'paused').default('composing')
+    presence: Joi.string().valid('composing', 'recording', 'paused').default('composing')
 }))
 
 export const validateListGroupsOrContacts = validate(Joi.object({
     sessionId: sessionIdSchema
+}), 'params')
+
+export const validateGroupParticipants = validate(Joi.object({
+    sessionId: sessionIdSchema,
+    groupId: Joi.string().required(),
+    participants: Joi.array().items(Joi.string()).min(1).required(),
+    action: Joi.string().valid('add', 'remove', 'promote', 'demote').optional()
+}))
+
+export const validateGroupInvite = validate(Joi.object({
+    sessionId: sessionIdSchema,
+    groupId: Joi.string().required()
+}))
+
+export const validateGroupJoin = validate(Joi.object({
+    sessionId: sessionIdSchema,
+    code: Joi.string().required()
+}))
+
+export const validateGroupSettings = validate(Joi.object({
+    sessionId: sessionIdSchema,
+    groupId: Joi.string().required(),
+    setting: Joi.string().valid('announcement', 'not-announcement', 'locked', 'unlocked').required()
+}))
+
+export const validateGroupIdentity = validate(Joi.object({
+    sessionId: sessionIdSchema,
+    groupId: Joi.string().required(),
+    type: Joi.string().valid('subject', 'description', 'picture').required(),
+    value: Joi.string().required() // Can be subject text, description text, or image URL for picture
+}))
+
+export const validateSendStatus = validate(Joi.object({
+    sessionId: sessionIdSchema,
+    mediaUrl: Joi.string().uri().optional(),
+    mediaType: Joi.string().valid('image', 'text').default('text'),
+    message: Joi.string().max(4096).optional(), // message for text status
+    caption: Joi.string().max(1024).optional() // caption for image status
+}))
+
+export const validateGroupCreate = validate(Joi.object({
+    sessionId: sessionIdSchema,
+    subject: Joi.string().min(1).max(100).required(),
+    participants: Joi.array().items(phoneSchema).optional().default([])
+}))
+
+export const validateGroupMetadata = validate(Joi.object({
+    sessionId: sessionIdSchema,
+    groupId: Joi.string().required()
 }), 'params')

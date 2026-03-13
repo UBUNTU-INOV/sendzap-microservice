@@ -111,8 +111,8 @@ export const sendBulkMessage = async (req, res) => {
                 const isGroup = to.includes('-') || to.length > 15
                 const jid = to.includes('@') ? to : (isGroup ? `${to}@g.us` : `${to}@s.whatsapp.net`)
 
-                await session.sock.sendMessage(jid, payload)
-                results.push({ to, status: 'sent' })
+                const sentMsg = await session.sock.sendMessage(jid, payload)
+                results.push({ to, status: 'sent', messageId: sentMsg.key.id })
 
                 if (receivers.indexOf(to) < receivers.length - 1) {
                     await delay(delayMs)
@@ -237,7 +237,7 @@ export const sendContact = async (req, res) => {
 
 export const setTyping = async (req, res) => {
     try {
-        const { sessionId, to, state } = req.body
+        const { sessionId, to, presence } = req.body
         const session = sessionManager.getSession(sessionId)
 
         if (!session || session.status !== 'connected') {
@@ -247,7 +247,7 @@ export const setTyping = async (req, res) => {
         const jid = to.includes('@') ? to : (to.includes('-') ? `${to}@g.us` : `${to}@s.whatsapp.net`)
 
         // state: 'composing' | 'recording' | 'paused'
-        await session.sock.sendPresenceUpdate(state || 'composing', jid)
+        await session.sock.sendPresenceUpdate(presence || 'composing', jid)
 
         res.json({ status: 'success' })
     } catch (error) {

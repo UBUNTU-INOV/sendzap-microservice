@@ -1,6 +1,9 @@
 import express from 'express'
 import * as sessionController from '../controllers/session.controller.js'
 import * as messageController from '../controllers/message.controller.js'
+import * as groupController from '../controllers/group.controller.js'
+import * as statusController from '../controllers/status.controller.js'
+import * as healthController from '../controllers/health.controller.js'
 
 import { messageLimiter, checkNumberLimiter } from '../middleware/rate-limit.middleware.js'
 
@@ -11,7 +14,15 @@ import {
     validateCheckNumber,
     validateSendContact,
     validateSetTyping,
-    validateListGroupsOrContacts
+    validateListGroupsOrContacts,
+    validateGroupParticipants,
+    validateGroupInvite,
+    validateGroupJoin,
+    validateGroupSettings,
+    validateGroupIdentity,
+    validateSendStatus,
+    validateGroupCreate,
+    validateGroupMetadata
 } from '../middleware/validation.middleware.js'
 
 const router = express.Router()
@@ -31,5 +42,23 @@ router.get('/contacts/:sessionId', validateListGroupsOrContacts, messageControll
 router.post('/check-number', validateCheckNumber, checkNumberLimiter, messageController.checkNumber)
 router.post('/send-contact', validateSendContact, messageLimiter, messageController.sendContact)
 router.post('/set-typing', validateSetTyping, messageController.setTyping)
+
+// Group management routes
+router.post('/groups/participants/update', validateGroupParticipants, groupController.updateParticipants)
+router.post('/groups/participants/add', validateGroupParticipants, groupController.addParticipants)
+router.post('/groups/participants/remove', validateGroupParticipants, groupController.removeParticipants)
+router.get('/groups/invite-code/:sessionId/:groupId', validateGroupInvite, groupController.getInviteCode)
+router.post('/groups/revoke-invite', validateGroupInvite, groupController.revokeInviteCode)
+router.post('/groups/join-invite', validateGroupJoin, groupController.joinGroupViaInvite)
+router.post('/groups/settings', validateGroupSettings, groupController.updateGroupSettings)
+router.post('/groups/identity', validateGroupIdentity, groupController.updateGroupIdentity)
+router.post('/groups/create', validateGroupCreate, groupController.createGroup)
+router.get('/groups/:sessionId/:groupId', validateGroupMetadata, groupController.getGroupMetadata)
+
+// Status routes
+router.post('/status/send', validateSendStatus, statusController.sendStatus)
+
+// Health check route
+router.get('/health', healthController.getHealth)
 
 export default router

@@ -3,12 +3,13 @@ import makeWASocket, {
     DisconnectReason,
     fetchLatestBaileysVersion
 } from '@whiskeysockets/baileys'
+import { useSqliteAuthState } from './sqlite-auth.service.js'
 import logger from '../config/logger.js'
 
 import { triggerWebhook } from './webhook.service.js'
 
-export async function createConnection(sessionId, { onQR, onStatusChange, onSocket }, retryCount = 0) {
-    const { state, saveCreds } = await useMultiFileAuthState(`sessions/${sessionId}`)
+export async function createConnection(sessionId, { onQR, onStatusChange, onSocket, onLogout }, retryCount = 0) {
+    const { state, saveCreds } = await useSqliteAuthState(sessionId)
     const { version, isLatest } = await fetchLatestBaileysVersion()
 
     logger.info(`Session ${sessionId}: Using Baileys v${version.join('.')}, isLatest: ${isLatest}`)
@@ -19,7 +20,7 @@ export async function createConnection(sessionId, { onQR, onStatusChange, onSock
         printQRInTerminal: false,
         logger: logger.child({ session: sessionId, level: 'silent' }),
         // Customize what appears on the phone (Linked Devices)
-        browser: ['SendZap', 'Chrome', '1.0'],
+        browser: ['SendZap', 'Chrome', '2.1'],
         // Optimizations for high-density (low RAM)
         syncFullHistory: false,
         markOnlineOnConnect: false,
@@ -35,9 +36,24 @@ export async function createConnection(sessionId, { onQR, onStatusChange, onSock
         if (type === 'notify') {
             for (const msg of messages) {
                 if (!msg.key.fromMe) {
+                    const jid = msg.key.remoteJid
+                    const isGroup = jid.endsWith('@g.us')
+
+                    // Filter: Ignore WhatsApp status updates
+                    if (jid === 'status@broadcast') {
+                        continue
+                    }
+
+                    // Filter: Only private messages for the chatbot
+                    if (isGroup) {
+                        logger.debug(`Session ${sessionId}: Ignoring group message from ${jid}`)
+                        continue
+                    }
+
                     // Extract minimal data needed for the webhook
                     const data = {
                         sessionId,
+                        from: jid,
                         message: msg,
                         // Helper to get text content easily
                         content: msg.message?.conversation ||
@@ -47,9 +63,33 @@ export async function createConnection(sessionId, { onQR, onStatusChange, onSock
                             ''
                     }
 
-                    logger.info(`Session ${sessionId}: Received message from ${msg.key.remoteJid}`)
+                    logger.info(`Session ${sessionId}: Private message received from ${jid}`)
                     triggerWebhook('message.upsert', data)
                 }
+            }
+        }
+    })
+
+    // Listen for group participants update (join, leave, etc)
+    sock.ev.on('group-participants.update', async (update) => {
+        logger.info(`Session ${sessionId}: Participants update for ${update.id} (Action: ${update.action})`)
+        triggerWebhook('group-participants.update', {
+            sessionId,
+            ...update
+        })
+    })
+
+    // Listen for message updates (delivery receipts, read receipts, etc)
+    sock.ev.on('messages.update', async (updates) => {
+        for (const update of updates) {
+            if (update.update.status) {
+                logger.info(`Session ${sessionId}: Message status update for ${update.key.id}: ${update.update.status}`)
+                triggerWebhook('message.update', {
+                    sessionId,
+                    key: update.key,
+                    status: update.update.status,
+                    timestamp: update.update.messageTimestamp
+                })
             }
         }
     })
@@ -89,10 +129,11 @@ export async function createConnection(sessionId, { onQR, onStatusChange, onSock
                 logger.info(`Session ${sessionId}: Reconnecting in ${delay}ms... (Attempt ${retryCount + 1})`)
 
                 setTimeout(() => {
-                    createConnection(sessionId, { onQR, onStatusChange, onSocket }, retryCount + 1)
+                    createConnection(sessionId, { onQR, onStatusChange, onSocket, onLogout }, retryCount + 1)
                 }, delay)
             } else if (statusCode === DisconnectReason.loggedOut || statusCode === 401) {
-                logger.error(`Session ${sessionId}: Logged out or unauthorized.`)
+                logger.error(`Session ${sessionId}: Logged out or unauthorized. Cleaning up...`)
+                if (onLogout) onLogout()
             }
         }
     })

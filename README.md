@@ -1,164 +1,62 @@
 # WhatsApp Noweb Microservice 🚀
 
-A robust and lightweight WhatsApp API microservice built with Node.js and `@whiskeysockets/baileys`. 
-This service is designed as an **outbound-only** bridge for your SAAS (e.g., Laravel backend) to send messages without the overhead of Puppeteer or a browser.
+A robust, ultra-lightweight WhatsApp API microservice built with Node.js and `@whiskeysockets/baileys`. 
+Optimized for high-density SAAS environments (e.g., Laravel backends) to manage hundreds of sessions with minimal RAM.
 
-## Features
-- **Ultra-Lightweight**: No Puppeteer, purely socket-based.
-- **High Density**: Optimized to run 100+ session instances on an 8GB VPS.
-- **Production Ready**: Secured with API Keys and Docker/Coolify configuration.
-- **Laravel Integration**: Built-in webhook support for session status updates.
+## 🌟 Key Features
+- **SQLite Persistence**: Sessions and webhook queue are stored in SQLite, no data loss on restart/redeploy.
+- **Reliable Webhooks**: Built-in queue with exponential backoff retries and HMAC security.
+- **Optimized for VPS**: Designed to run 100+ sessions on an 8GB VPS without Puppeteer/Browser overhead.
+- **Group Management**: Full control over group creation, participants, and settings.
+- **Health Monitoring**: Real-time system stats (CPU, RAM, Uptime) and session health.
 
 ---
 
-## 🛠 Configuration & Deployment
+## 🛠 Quick Start
 
-### Environment Variables (`.env`)
-Copy `.env.example` to `.env` and configure:
-```env
-PORT=3000
-API_KEY=your_secret_key
-WEBHOOK_URL=https://your-laravel-app.com/api/whatsapp/webhook
+### 1. Installation
+```bash
+npm install
+cp .env.example .env # Configure your API_KEY and WEBHOOK_URL
 ```
 
-### Deployment (Coolify / Docker)
-The project includes a `Dockerfile` and `docker-compose.yml`.
-Ensure the `./sessions` directory is mounted as a persistent volume to keep your WhatsApp login sessions across restarts.
+### 2. Run
+```bash
+npm start
+```
+
+### 3. Access Documentation
+Once the server is running, access the interactive Swagger UI at:
+**`http://localhost:3000/api-docs`**
 
 ---
 
-## 🔐 Authentication
-All API requests **must** include the following header:
-- `X-API-KEY`: Your secret key defined in `.env`.
+## 🔐 Security & Monitoring
+- **Authentication**: All requests must include the `X-API-KEY` header.
+- **Webhook Security**: Verify incoming webhooks using the `X-Webhook-Signature` (HMAC-SHA256).
+- **Health Check**: Monitor your instance at `/health`.
 
 ---
 
-## 🚀 API Endpoints
+## 📁 API Categories (Interactive UI)
+The API is structured into five main categories available in the [Swagger UI](http://localhost:3000/api-docs):
 
-### 📱 Session Management
-
-#### 1. Create or Resume Session
-`POST /session/{id}`
-Initializes or reconnects a session. Returns a QR code if a new login is required.
-
-#### 2. Get QR Code (Image)
-`GET /session/{id}/qr`
-Returns the QR code as a PNG image directly.
-
-#### 3. List Sessions
-`GET /sessions`
-Returns a list of all managed sessions and their states.
-
-#### 4. Delete Session
-`DELETE /session/{id}`
-Logs out and deletes all local session data.
+1. **Health**: Monitoring and system statistics.
+2. **Sessions**: Multi-device authentication and QR code management.
+3. **Messages**: Sending text, media, bulk, and contact cards.
+4. **Groups**: Comprehensive group creation and participant management.
+5. **Status**: Post updates to WhatsApp Status (Stories).
 
 ---
 
-### 🔍 Verification
+## 🐳 Docker Deployment
+Use the included `Dockerfile` and `docker-compose.yml`. 
+**Important**: Mount the `./sessions` directory as a volume to persist your WhatsApp logins.
 
-#### 1. Check if number exists
-`GET /check-number/{sessionId}/{number}`
-Verify if a phone number is registered on WhatsApp before sending.
-
-**Response Example:**
-```json
-{
-  "number": "22990000000",
-  "exists": true,
-  "jid": "22990000000@s.whatsapp.net"
-}
+```bash
+docker-compose up -d
 ```
 
 ---
-
-### ✉️ Messaging
-
-#### 1. Send Single Message (Text or Media)
-`POST /send`
-
-**Body Raw (JSON) - Text Message:**
-```json
-{
-  "sessionId": "bossi",
-  "to": "22990000000",
-  "message": "Bonjour ! Ceci est un message texte."
-}
-```
-
-**Body Raw (JSON) - Image Message:**
-```json
-{
-  "sessionId": "bossi",
-  "to": "22990000000",
-  "mediaUrl": "https://example.com/image.png",
-  "mediaType": "image",
-  "message": "Regardez cette image !",
-  "caption": "Légende de l'image"
-}
-```
-
-**Options for `mediaType`**: `image`, `video`, `audio`, `document`.
-
----
-
-#### 2. Send Bulk Messages
-`POST /send-bulk`
-Sends messages to multiple recipients with a configurable delay to prevent spam detection.
-
-**Body Raw (JSON):**
-```json
-{
-  "sessionId": "bossi",
-  "receivers": ["22990000001", "22990000002"],
-  "message": "Notification importante pour tous !",
-  "delayMs": 2000,
-  "mediaUrl": "https://example.com/promo.jpg",
-  "mediaType": "image"
-}
-```
-
----
-
-#### 3. Send Contact (VCard)
-`POST /send-contact`
-Send a professional contact card to a recipient.
-
-**Body Raw (JSON):**
-```json
-{
-  "sessionId": "bossi",
-  "to": "22990000000",
-  "contactName": "John Doe",
-  "contactNumber": "22991919191",
-  "organization": "Ma Super Entreprise"
-}
-```
-
----
-
-### 📂 Information Retrieval
-
-#### 1. List Groups
-`GET /groups/{sessionId}`
-
-#### 2. List Contacts
-`GET /contacts/{sessionId}`
-
----
-
-## 🪝 Webhooks
-If `WEBHOOK_URL` is configured, the microservice will push the following event:
-
-**Session Status Update:**
-```json
-{
-  "event": "session.status",
-  "timestamp": "2024-01-22T10:00:00.000Z",
-  "data": {
-    "sessionId": "bossi",
-    "status": "connected"
-  }
-}
-```
-*Note: Incoming message listening is disabled for maximum performance. Use your Laravel backend for business logic.*
+*Note: Incoming private messages and group events are active by default for chatbot integration.*
+*Created with ❤️ for high-performance WhatsApp automation.*

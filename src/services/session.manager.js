@@ -1,4 +1,5 @@
 import { createConnection } from './whatsapp.service.js'
+import { getStoredSessionIds, deleteStoredSession } from './sqlite-auth.service.js'
 import { readdirSync, existsSync } from 'fs'
 import logger from '../config/logger.js'
 
@@ -8,13 +9,18 @@ const SESSIONS_DIR = './sessions'
 export async function initSessions() {
     if (!existsSync(SESSIONS_DIR)) return
 
-    const dirs = readdirSync(SESSIONS_DIR, { withFileTypes: true })
+    const folderSessions = readdirSync(SESSIONS_DIR, { withFileTypes: true })
         .filter(dirent => dirent.isDirectory())
         .map(dirent => dirent.name.trim())
 
-    logger.info(`Found ${dirs.length} existing sessions. Reloading...`)
+    const dbSessions = getStoredSessionIds()
+    
+    // Fusionner les dossiers et les sessions DB (sans doublons)
+    const allSessionIds = Array.from(new Set([...folderSessions, ...dbSessions]))
 
-    for (const sessionId of dirs) {
+    logger.info(`Found ${allSessionIds.length} sessions (${folderSessions.length} folders, ${dbSessions.length} in DB). Reloading...`)
+
+    for (const sessionId of allSessionIds) {
         await createSession(sessionId)
     }
 }
@@ -48,6 +54,11 @@ export async function createSession(sessionId) {
                 },
                 onSocket: (sock) => {
                     session.sock = sock
+                },
+                onLogout: () => {
+                    deleteStoredSession(sessionId)
+                    sessions.delete(sessionId)
+                    logger.info(`Session ${sessionId}: Logged out from phone. Database cleared.`)
                 }
             })
         } catch (error) {
@@ -88,8 +99,9 @@ export async function deleteSession(sessionId) {
                 logger.error(`Error logging out session ${sessionId}:`, err)
             }
         }
+        deleteStoredSession(sessionId)
         sessions.delete(sessionId)
-        logger.info(`Session ${sessionId}: Deleted and resources pruned.`)
+        logger.info(`Session ${sessionId}: Deleted and database cleared.`)
     }
 }
 
