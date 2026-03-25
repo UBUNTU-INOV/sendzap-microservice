@@ -4,6 +4,7 @@ import { readdirSync, existsSync } from 'fs'
 import logger from '../config/logger.js'
 
 const sessions = new Map()
+const knownSessions = new Set()
 const SESSIONS_DIR = './sessions'
 
 export async function initSessions() {
@@ -18,10 +19,10 @@ export async function initSessions() {
     // Fusionner les dossiers et les sessions DB (sans doublons)
     const allSessionIds = Array.from(new Set([...folderSessions, ...dbSessions]))
 
-    logger.info(`Found ${allSessionIds.length} sessions (${folderSessions.length} folders, ${dbSessions.length} in DB). Reloading...`)
+    logger.info(`Found ${allSessionIds.length} sessions (${folderSessions.length} folders, ${dbSessions.length} in DB). Registered for lazy loading.`)
 
     for (const sessionId of allSessionIds) {
-        await createSession(sessionId)
+        knownSessions.add(sessionId)
     }
 }
 
@@ -29,6 +30,8 @@ export async function createSession(sessionId) {
     if (sessions.has(sessionId)) {
         return sessions.get(sessionId)
     }
+
+    knownSessions.delete(sessionId)
 
     const session = {
         id: sessionId,
@@ -72,7 +75,19 @@ export async function createSession(sessionId) {
 }
 
 export function getSession(sessionId) {
-    return sessions.get(sessionId)
+    if (sessions.has(sessionId)) {
+        return sessions.get(sessionId)
+    }
+
+    if (knownSessions.has(sessionId)) {
+        logger.info(`Session ${sessionId}: Lazy initializing...`)
+        // Start initialization but don't await it here as getSession is expected to be sync by callers
+        // Returning the initial session object allows callers to see 'initializing' status
+        createSession(sessionId)
+        return sessions.get(sessionId)
+    }
+
+    return null
 }
 
 export function getAllSessions() {
