@@ -6,7 +6,8 @@ Optimized for high-density SAAS environments (e.g., Laravel backends) to manage 
 ## 🌟 Key Features
 - **SQLite Persistence**: Sessions and webhook queue are stored in SQLite, no data loss on restart/redeploy.
 - **Reliable Webhooks**: Built-in queue with exponential backoff retries and HMAC security.
-- **Optimized for VPS**: Designed to run 100+ sessions on an 8GB VPS without Puppeteer/Browser overhead.
+- **Lazy Loading**: Sessions connect only when needed, ensuring ultra-fast startup and reduced CPU/RAM idle usage.
+- **Optimized for VPS**: Configured for 4GB+ RAM to run **150+ sessions** comfortably on an 8GB VPS.
 - **Group Management**: Full control over group creation, participants, and settings.
 - **Health Monitoring**: Real-time system stats (CPU, RAM, Uptime) and session health.
 
