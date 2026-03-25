@@ -15,7 +15,7 @@ export async function initSessions() {
         .map(dirent => dirent.name.trim())
 
     const dbSessions = getStoredSessionIds()
-    
+
     // Fusionner les dossiers et les sessions DB (sans doublons)
     const allSessionIds = Array.from(new Set([...folderSessions, ...dbSessions]))
 
@@ -91,19 +91,11 @@ export function getSession(sessionId) {
 }
 
 export function getAllSessions() {
-    const active = Array.from(sessions.values()).map(s => ({
+    return Array.from(sessions.values()).map(s => ({
         id: s.id,
         status: s.status,
         hasQR: !!s.qr
     }))
-
-    const idle = Array.from(knownSessions).map(id => ({
-        id,
-        status: 'off',
-        hasQR: false
-    }))
-
-    return [...active, ...idle]
 }
 
 export function getFirstConnectedSession() {
