@@ -91,11 +91,19 @@ export function getSession(sessionId) {
 }
 
 export function getAllSessions() {
-    return Array.from(sessions.values()).map(s => ({
+    const active = Array.from(sessions.values()).map(s => ({
         id: s.id,
         status: s.status,
         hasQR: !!s.qr
     }))
+
+    const idle = Array.from(knownSessions).map(id => ({
+        id,
+        status: 'off',
+        hasQR: false
+    }))
+
+    return [...active, ...idle]
 }
 
 export function getFirstConnectedSession() {
