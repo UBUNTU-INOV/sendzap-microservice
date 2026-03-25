@@ -24,7 +24,6 @@ export async function createConnection(sessionId, { onQR, onStatusChange, onSock
         // Optimizations for high-density (low RAM)
         syncFullHistory: false,
         markOnlineOnConnect: false,
-        shouldIgnoreJid: (jid) => jid?.includes('newsletter'), // Ignore newsletters to save RAM
     })
 
     if (onSocket) onSocket(sock)
@@ -38,15 +37,10 @@ export async function createConnection(sessionId, { onQR, onStatusChange, onSock
                 if (!msg.key.fromMe) {
                     const jid = msg.key.remoteJid
                     const isGroup = jid.endsWith('@g.us')
+                    const isNewsletter = jid.endsWith('@newsletter')
 
                     // Filter: Ignore WhatsApp status updates
                     if (jid === 'status@broadcast') {
-                        continue
-                    }
-
-                    // Filter: Only private messages for the chatbot
-                    if (isGroup) {
-                        logger.debug(`Session ${sessionId}: Ignoring group message from ${jid}`)
                         continue
                     }
 
@@ -55,6 +49,8 @@ export async function createConnection(sessionId, { onQR, onStatusChange, onSock
                         sessionId,
                         from: jid,
                         message: msg,
+                        isGroup,
+                        isNewsletter,
                         // Helper to get text content easily
                         content: msg.message?.conversation ||
                             msg.message?.extendedTextMessage?.text ||
@@ -63,8 +59,16 @@ export async function createConnection(sessionId, { onQR, onStatusChange, onSock
                             ''
                     }
 
-                    logger.info(`Session ${sessionId}: Private message received from ${jid}`)
-                    triggerWebhook('message.upsert', data)
+                    if (isNewsletter) {
+                        logger.info(`Session ${sessionId}: Newsletter message received from ${jid}`)
+                        triggerWebhook('newsletter.message', data)
+                    } else if (isGroup) {
+                        logger.info(`Session ${sessionId}: Group message received from ${jid}`)
+                        triggerWebhook('group.message', data)
+                    } else {
+                        logger.info(`Session ${sessionId}: Private message received from ${jid}`)
+                        triggerWebhook('message.upsert', data)
+                    }
                 }
             }
         }

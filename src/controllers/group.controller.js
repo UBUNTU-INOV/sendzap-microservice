@@ -219,3 +219,61 @@ export const getGroupMetadata = async (req, res) => {
         res.status(500).json({ error: error.message })
     }
 }
+
+/**
+ * Leave a group
+ */
+export const leaveGroup = async (req, res) => {
+    try {
+        const { sessionId, groupId } = req.body
+        const session = sessionManager.getSession(sessionId)
+
+        if (!session || session.status !== 'connected') {
+            return res.status(400).json({ error: 'Session not found or not connected' })
+        }
+
+        const jid = groupId.includes('@') ? groupId : `${groupId}@g.us`
+        await session.sock.groupLeave(jid)
+
+        res.json({ status: 'success', message: 'Left the group' })
+    } catch (error) {
+        logger.error(`Controller Error (leaveGroup):`, error)
+        res.status(500).json({ error: error.message })
+    }
+}
+
+/**
+ * Get group participants list with roles
+ */
+export const getGroupParticipants = async (req, res) => {
+    try {
+        const { sessionId, groupId } = req.params
+        const session = sessionManager.getSession(sessionId)
+
+        if (!session || session.status !== 'connected') {
+            return res.status(400).json({ error: 'Session not found or not connected' })
+        }
+
+        const jid = groupId.includes('@') ? groupId : `${groupId}@g.us`
+        const metadata = await session.sock.groupMetadata(jid)
+
+        const participants = metadata.participants.map(p => ({
+            id: p.id,
+            admin: p.admin || null, // 'admin' | 'superadmin' | null
+            isAdmin: p.admin === 'admin' || p.admin === 'superadmin',
+            isSuperAdmin: p.admin === 'superadmin'
+        }))
+
+        res.json({
+            status: 'success',
+            groupId: jid,
+            groupName: metadata.subject,
+            count: participants.length,
+            participants
+        })
+    } catch (error) {
+        logger.error(`Controller Error (getGroupParticipants):`, error)
+        res.status(500).json({ error: error.message })
+    }
+}
+
