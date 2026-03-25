@@ -98,9 +98,16 @@ export const validateGroupIdentity = validate(Joi.object({
 export const validateSendStatus = validate(Joi.object({
     sessionId: sessionIdSchema,
     mediaUrl: Joi.string().uri().optional(),
-    mediaType: Joi.string().valid('image', 'text').default('text'),
-    message: Joi.string().max(4096).optional(), // message for text status
-    caption: Joi.string().max(1024).optional() // caption for image status
+    mediaType: Joi.string().valid('image', 'video', 'audio', 'text').default('text'),
+    message: Joi.string().max(4096).optional(),
+    caption: Joi.string().max(1024).optional(),
+    backgroundColor: Joi.string().max(20).optional(), // e.g. '#FF5733'
+    font: Joi.number().integer().min(0).max(5).optional()
+}))
+
+export const validateDeleteStatus = validate(Joi.object({
+    sessionId: sessionIdSchema,
+    messageId: Joi.string().required()
 }))
 
 export const validateGroupCreate = validate(Joi.object({
@@ -113,3 +120,57 @@ export const validateGroupMetadata = validate(Joi.object({
     sessionId: sessionIdSchema,
     groupId: Joi.string().required()
 }), 'params')
+
+export const validateGroupLeave = validate(Joi.object({
+    sessionId: sessionIdSchema,
+    groupId: Joi.string().required()
+}))
+
+// ─── Channel/Newsletter Validations ──────────────────────────────────────
+
+export const validateChannelList = validate(Joi.object({
+    sessionId: sessionIdSchema
+}), 'params')
+
+export const validateChannelCreate = validate(Joi.object({
+    sessionId: sessionIdSchema,
+    name: Joi.string().min(1).max(100).required(),
+    description: Joi.string().max(2048).optional()
+}))
+
+export const validateChannelSend = validate(Joi.object({
+    sessionId: sessionIdSchema,
+    channelId: Joi.string().required(),
+    message: Joi.string().max(4096).optional(),
+    mediaUrl: Joi.string().uri().optional(),
+    mediaType: Joi.string().valid('image', 'video', 'audio', 'document').optional(),
+    caption: Joi.string().max(1024).optional()
+}))
+
+export const validateChannelInfo = validate(Joi.object({
+    sessionId: sessionIdSchema,
+    channelId: Joi.string().required()
+}), 'params')
+
+export const validateChannelFollow = validate(Joi.object({
+    sessionId: sessionIdSchema,
+    channelId: Joi.string().required()
+}))
+
+export const validateChannelMute = validate(Joi.object({
+    sessionId: sessionIdSchema,
+    channelId: Joi.string().required(),
+    mute: Joi.boolean().default(true)
+}))
+
+export const validateChannelUpdate = validate(Joi.object({
+    sessionId: sessionIdSchema,
+    channelId: Joi.string().required(),
+    type: Joi.string().valid('name', 'description', 'picture').required(),
+    value: Joi.string().required()
+}))
+
+export const validateChannelDelete = validate(Joi.object({
+    sessionId: sessionIdSchema,
+    channelId: Joi.string().required()
+}))

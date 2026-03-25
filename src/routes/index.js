@@ -3,6 +3,7 @@ import * as sessionController from '../controllers/session.controller.js'
 import * as messageController from '../controllers/message.controller.js'
 import * as groupController from '../controllers/group.controller.js'
 import * as statusController from '../controllers/status.controller.js'
+import * as channelController from '../controllers/channel.controller.js'
 import * as healthController from '../controllers/health.controller.js'
 
 import { messageLimiter, checkNumberLimiter } from '../middleware/rate-limit.middleware.js'
@@ -21,8 +22,18 @@ import {
     validateGroupSettings,
     validateGroupIdentity,
     validateSendStatus,
+    validateDeleteStatus,
     validateGroupCreate,
-    validateGroupMetadata
+    validateGroupMetadata,
+    validateGroupLeave,
+    validateChannelList,
+    validateChannelCreate,
+    validateChannelSend,
+    validateChannelInfo,
+    validateChannelFollow,
+    validateChannelMute,
+    validateChannelUpdate,
+    validateChannelDelete
 } from '../middleware/validation.middleware.js'
 
 const router = express.Router()
@@ -34,7 +45,7 @@ router.get('/session/:id', validateSessionId, sessionController.getSessionStatus
 router.get('/session/:id/qr', validateSessionId, sessionController.getQRImage)
 router.delete('/session/:id', validateSessionId, sessionController.deleteSession)
 
-// Message & Group routes
+// Message & Contact routes
 router.post('/send', validateSendMessage, messageLimiter, messageController.sendMessage)
 router.post('/send-bulk', validateSendBulk, messageLimiter, messageController.sendBulkMessage)
 router.get('/groups/:sessionId', validateListGroupsOrContacts, messageController.listGroups)
@@ -53,10 +64,24 @@ router.post('/groups/join-invite', validateGroupJoin, groupController.joinGroupV
 router.post('/groups/settings', validateGroupSettings, groupController.updateGroupSettings)
 router.post('/groups/identity', validateGroupIdentity, groupController.updateGroupIdentity)
 router.post('/groups/create', validateGroupCreate, groupController.createGroup)
+router.post('/groups/leave', validateGroupLeave, groupController.leaveGroup)
+router.get('/groups/participants/:sessionId/:groupId', validateGroupMetadata, groupController.getGroupParticipants)
 router.get('/groups/:sessionId/:groupId', validateGroupMetadata, groupController.getGroupMetadata)
 
-// Status routes
+// Status/Story routes
 router.post('/status/send', validateSendStatus, statusController.sendStatus)
+router.post('/status/delete', validateDeleteStatus, statusController.deleteStatus)
+
+// Channel/Newsletter routes
+router.get('/channels/:sessionId', validateChannelList, channelController.listChannels)
+router.post('/channels/create', validateChannelCreate, channelController.createChannel)
+router.post('/channels/send', validateChannelSend, messageLimiter, channelController.sendChannelMessage)
+router.get('/channels/info/:sessionId/:channelId', validateChannelInfo, channelController.getChannelInfo)
+router.post('/channels/follow', validateChannelFollow, channelController.followChannel)
+router.post('/channels/unfollow', validateChannelFollow, channelController.unfollowChannel)
+router.post('/channels/mute', validateChannelMute, channelController.muteChannel)
+router.post('/channels/update', validateChannelUpdate, channelController.updateChannel)
+router.post('/channels/delete', validateChannelDelete, channelController.deleteChannel)
 
 // Health check route
 router.get('/health', healthController.getHealth)

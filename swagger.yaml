@@ -6,9 +6,9 @@ info:
     
     ### Rate Limiting
     - **Global**: 100 requests per 15 minutes per IP.
-    - **Messaging**: 30 requests per minute per IP for `/send`, `/send-bulk`, and `/send-contact`.
+    - **Messaging**: 30 requests per minute per IP for `/send`, `/send-bulk`, `/send-contact`, `/channels/send`.
     - **Number Check**: 60 requests per minute per IP for `/check-number`.
-  version: 1.0.0
+  version: 2.0.0
 servers:
   - url: http://localhost:3000
     description: Local/Dev server
@@ -24,6 +24,8 @@ tags:
     description: Comprehensive group management
   - name: Status
     description: WhatsApp Status (Stories) updates
+  - name: Channels
+    description: WhatsApp Channels (Newsletters) management
 
 components:
   securitySchemes:
@@ -321,7 +323,6 @@ paths:
             schema:
               type: object
               required:
-                - sessionId
                 - number
               properties:
                 sessionId:
@@ -379,7 +380,7 @@ paths:
       tags:
         - Messages
       summary: List Contacts
-      description: Retrieve a list of known contacts (requires store initialization).
+      description: Retrieve a list of known contacts.
       parameters:
         - name: sessionId
           in: path
@@ -437,7 +438,7 @@ paths:
       tags:
         - Groups
       summary: Create New Group
-      description: Create a new WhatsApp group. For anti-ban, consider adding participants later.
+      description: Create a new WhatsApp group.
       requestBody:
         required: true
         content:
@@ -461,6 +462,77 @@ paths:
       responses:
         '200':
           description: Group created
+
+  /groups/leave:
+    post:
+      tags:
+        - Groups
+      summary: Leave Group
+      description: Leave a WhatsApp group.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - sessionId
+                - groupId
+              properties:
+                sessionId:
+                  type: string
+                groupId:
+                  type: string
+      responses:
+        '200':
+          description: Left the group
+
+  /groups/participants/{sessionId}/{groupId}:
+    get:
+      tags:
+        - Groups
+      summary: Get Group Participants with Roles
+      description: Get the list of participants in a group with their admin/member roles.
+      parameters:
+        - in: path
+          name: sessionId
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: groupId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Participants list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  groupId:
+                    type: string
+                  groupName:
+                    type: string
+                  count:
+                    type: integer
+                  participants:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        admin:
+                          type: string
+                        isAdmin:
+                          type: boolean
+                        isSuperAdmin:
+                          type: boolean
 
   /groups/participants/add:
     post:
@@ -683,7 +755,7 @@ paths:
       tags:
         - Status
       summary: Send Status (Story)
-      description: Post a text or media status update.
+      description: Post a text, image, video, or audio status update with optional background color and font for text stories.
       requestBody:
         required: true
         content:
@@ -692,25 +764,296 @@ paths:
               type: object
               required:
                 - sessionId
-                - mediaType
               properties:
                 sessionId:
                   type: string
                 mediaType:
                   type: string
-                  enum: [text, image, video]
+                  enum: [text, image, video, audio]
+                  default: text
                 message:
                   type: string
-                  description: Text content (required for 'text' type)
+                  description: Text content (for text status)
                 mediaUrl:
                   type: string
-                  description: Media URL (required for 'image'/'video' type)
+                  description: Media URL (required for image/video/audio)
                 caption:
                   type: string
                 backgroundColor:
                   type: string
+                  description: Background color for text status (e.g. '#FF5733')
                 font:
                   type: integer
+                  description: Font style (0-5) for text status
       responses:
         '200':
           description: Status posted
+
+  /status/delete:
+    post:
+      tags:
+        - Status
+      summary: Delete Status
+      description: Delete a previously posted status update.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - sessionId
+                - messageId
+              properties:
+                sessionId:
+                  type: string
+                messageId:
+                  type: string
+                  description: The message ID of the status to delete
+      responses:
+        '200':
+          description: Status deleted
+
+  # --- CHANNELS (NEWSLETTERS) ---
+  /channels/{sessionId}:
+    get:
+      tags:
+        - Channels
+      summary: List Subscribed Channels
+      description: Get all channels/newsletters the session is subscribed to.
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of channels
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  count:
+                    type: integer
+                  channels:
+                    type: array
+                    items:
+                      type: object
+
+  /channels/create:
+    post:
+      tags:
+        - Channels
+      summary: Create Channel
+      description: Create a new WhatsApp Channel.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - sessionId
+                - name
+              properties:
+                sessionId:
+                  type: string
+                name:
+                  type: string
+                  description: Channel name
+                description:
+                  type: string
+                  description: Channel description
+      responses:
+        '200':
+          description: Channel created
+
+  /channels/send:
+    post:
+      tags:
+        - Channels
+      summary: Send Channel Message
+      description: Send a text or media message to a WhatsApp Channel.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - sessionId
+                - channelId
+              properties:
+                sessionId:
+                  type: string
+                channelId:
+                  type: string
+                  description: Channel JID or ID
+                message:
+                  type: string
+                mediaUrl:
+                  type: string
+                mediaType:
+                  type: string
+                  enum: [image, video, audio, document]
+                caption:
+                  type: string
+      responses:
+        '200':
+          description: Message sent to channel
+
+  /channels/info/{sessionId}/{channelId}:
+    get:
+      tags:
+        - Channels
+      summary: Get Channel Info
+      description: Get metadata about a specific channel.
+      parameters:
+        - in: path
+          name: sessionId
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: channelId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Channel info retrieved
+
+  /channels/follow:
+    post:
+      tags:
+        - Channels
+      summary: Follow Channel
+      description: Subscribe to a WhatsApp Channel.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - sessionId
+                - channelId
+              properties:
+                sessionId:
+                  type: string
+                channelId:
+                  type: string
+      responses:
+        '200':
+          description: Subscribed to channel
+
+  /channels/unfollow:
+    post:
+      tags:
+        - Channels
+      summary: Unfollow Channel
+      description: Unsubscribe from a WhatsApp Channel.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - sessionId
+                - channelId
+              properties:
+                sessionId:
+                  type: string
+                channelId:
+                  type: string
+      responses:
+        '200':
+          description: Unsubscribed from channel
+
+  /channels/mute:
+    post:
+      tags:
+        - Channels
+      summary: Mute/Unmute Channel
+      description: Mute or unmute notifications from a channel.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - sessionId
+                - channelId
+              properties:
+                sessionId:
+                  type: string
+                channelId:
+                  type: string
+                mute:
+                  type: boolean
+                  default: true
+      responses:
+        '200':
+          description: Channel mute status updated
+
+  /channels/update:
+    post:
+      tags:
+        - Channels
+      summary: Update Channel Settings
+      description: Update the name, description, or picture of a channel you own.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - sessionId
+                - channelId
+                - type
+                - value
+              properties:
+                sessionId:
+                  type: string
+                channelId:
+                  type: string
+                type:
+                  type: string
+                  enum: [name, description, picture]
+                value:
+                  type: string
+                  description: New value (text or image URL for picture)
+      responses:
+        '200':
+          description: Channel updated
+
+  /channels/delete:
+    post:
+      tags:
+        - Channels
+      summary: Delete Channel
+      description: Permanently delete a channel you own.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - sessionId
+                - channelId
+              properties:
+                sessionId:
+                  type: string
+                channelId:
+                  type: string
+      responses:
+        '200':
+          description: Channel deleted
