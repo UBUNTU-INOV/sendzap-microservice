@@ -75,7 +75,7 @@ export const useSqliteAuthState = async (sessionId) => {
         } catch (error) {
             logger.error(`Session ${sessionId}: Erreur lors de la migration des credentials:`, error)
         }
-        
+
         return initAuthCreds()
     })()
 
@@ -96,7 +96,7 @@ export const useSqliteAuthState = async (sessionId) => {
                                         value = JSON.parse(readFileSync(oldKeyPath, 'utf-8'), BufferJSON.reviver)
                                         writeData(value, type, id)
                                     }
-                                } catch (e) {}
+                                } catch (e) { }
                             }
 
                             if (type === 'app-state-sync-key' && value) {
