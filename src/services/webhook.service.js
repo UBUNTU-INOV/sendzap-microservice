@@ -11,13 +11,13 @@ if (WEBHOOK_URL && !WEBHOOK_SECRET) {
 }
 
 const MAX_ATTEMPTS = 5
-const RECHECK_INTERVAL = 5000
-// Supprimer les webhooks échoués après 7 jours
+const RECHECK_INTERVAL = 3000  // faster processing under high message volume
+const BATCH_SIZE = 20           // process more webhooks per tick with 100 sessions
 const FAILED_TTL_MS = 7 * 24 * 60 * 60 * 1000
 
 const stmts = {
     insert: db.prepare(`INSERT INTO webhook_queue (event, payload, next_retry_at, created_at) VALUES (?, ?, ?, ?)`),
-    pending: db.prepare(`SELECT * FROM webhook_queue WHERE status = 'pending' AND next_retry_at <= ? ORDER BY created_at ASC LIMIT 10`),
+    pending: db.prepare(`SELECT * FROM webhook_queue WHERE status = 'pending' AND next_retry_at <= ? ORDER BY created_at ASC LIMIT ?`),
     delete: db.prepare(`DELETE FROM webhook_queue WHERE id = ?`),
     markFailed: db.prepare(`UPDATE webhook_queue SET status = 'failed', attempts = ? WHERE id = ?`),
     retry: db.prepare(`UPDATE webhook_queue SET attempts = ?, next_retry_at = ? WHERE id = ?`),
@@ -42,7 +42,7 @@ export const triggerWebhook = (event, data) => {
 
 const processQueue = async () => {
     const now = Date.now()
-    const pendingWebhooks = stmts.pending.all(now)
+    const pendingWebhooks = stmts.pending.all(now, BATCH_SIZE)
 
     for (const webhook of pendingWebhooks) {
         const payload = JSON.parse(webhook.payload)

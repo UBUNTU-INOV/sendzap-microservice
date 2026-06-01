@@ -10,6 +10,15 @@ if (!existsSync(SESSIONS_DIR)) {
 
 export const db = new Database('sessions/database.sqlite')
 
+// WAL mode allows concurrent reads while writes are in progress
+// Essential for 100+ sessions writing credentials simultaneously
+db.pragma('journal_mode = WAL')
+db.pragma('synchronous = NORMAL')   // safe with WAL, much faster than FULL
+db.pragma('cache_size = -65536')    // 64MB in-memory page cache
+db.pragma('temp_store = MEMORY')    // temp tables in RAM
+db.pragma('mmap_size = 268435456')  // 256MB memory-mapped I/O
+db.pragma('busy_timeout = 5000')    // wait up to 5s on lock instead of failing
+
 db.exec(`
     CREATE TABLE IF NOT EXISTS auth_state (
         session_id TEXT,

@@ -1,31 +1,27 @@
 import rateLimit from 'express-rate-limit'
 
+// With 100 sessions, the Laravel backend is the only client (single IP).
+// Limits are set high enough to not block legitimate multi-session traffic.
 export const globalLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 100, // Limit each IP to 100 requests per windowMs
-    standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
-    legacyHeaders: false, // Disable the `X-RateLimit-*` headers
-    message: {
-        error: 'Too many requests from this IP, please try again after 15 minutes'
-    }
+    windowMs: 15 * 60 * 1000,
+    max: 5000,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Too many requests, please try again later.' }
 })
 
 export const messageLimiter = rateLimit({
-    windowMs: 1 * 60 * 1000, // 1 minute
-    max: 30, // Limit each IP to 30 message requests per minute
+    windowMs: 1 * 60 * 1000,
+    max: 500,   // 100 sessions × 5 messages/sec burst
     standardHeaders: true,
     legacyHeaders: false,
-    message: {
-        error: 'Message rate limit exceeded. Please wait a moment.'
-    }
+    message: { error: 'Message rate limit exceeded. Please wait a moment.' }
 })
 
 export const checkNumberLimiter = rateLimit({
-    windowMs: 1 * 60 * 1000, // 1 minute
-    max: 60, // Limit each IP to 60 number checks per minute
+    windowMs: 1 * 60 * 1000,
+    max: 600,   // 100 sessions × 6 checks/min
     standardHeaders: true,
     legacyHeaders: false,
-    message: {
-        error: 'Number check rate limit exceeded. Please wait a moment.'
-    }
+    message: { error: 'Number check rate limit exceeded. Please wait a moment.' }
 })

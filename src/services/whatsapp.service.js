@@ -28,8 +28,17 @@ export async function createConnection(sessionId, { onQR, onStatusChange, onSock
         printQRInTerminal: false,
         logger: logger.child({ session: sessionId, level: 'silent' }),
         browser: ['SendZap', 'Chrome', '2.1'],
+        // Memory optimizations — critical for 100+ sessions
         syncFullHistory: false,
         markOnlineOnConnect: false,
+        generateHighQualityLinkPreview: false,
+        // Connection resilience under high load
+        connectTimeoutMs: 60000,
+        defaultQueryTimeoutMs: 60000,
+        keepAliveIntervalMs: 30000,
+        retryRequestDelayMs: 2000,
+        // Reduce in-memory message store size
+        getMessage: async () => undefined,
     })
 
     if (onSocket) onSocket(sock)
