@@ -5,23 +5,29 @@ import makeWASocket, {
 } from '@whiskeysockets/baileys'
 import { useSqliteAuthState } from './sqlite-auth.service.js'
 import logger from '../config/logger.js'
-
 import { triggerWebhook } from './webhook.service.js'
+
+// Fetch once per process lifetime to avoid redundant network calls on reconnections
+let cachedVersion = null
+async function getVersion() {
+    if (!cachedVersion) {
+        const { version, isLatest } = await fetchLatestBaileysVersion()
+        cachedVersion = version
+        logger.info(`Baileys version: ${version.join('.')}, isLatest: ${isLatest}`)
+    }
+    return cachedVersion
+}
 
 export async function createConnection(sessionId, { onQR, onStatusChange, onSocket, onLogout }, retryCount = 0) {
     const { state, saveCreds } = await useSqliteAuthState(sessionId)
-    const { version, isLatest } = await fetchLatestBaileysVersion()
-
-    logger.info(`Session ${sessionId}: Using Baileys v${version.join('.')}, isLatest: ${isLatest}`)
+    const version = await getVersion()
 
     const sock = makeWASocket({
         version,
         auth: state,
         printQRInTerminal: false,
         logger: logger.child({ session: sessionId, level: 'silent' }),
-        // Customize what appears on the phone (Linked Devices)
         browser: ['SendZap', 'Chrome', '2.1'],
-        // Optimizations for high-density (low RAM)
         syncFullHistory: false,
         markOnlineOnConnect: false,
     })
@@ -30,71 +36,59 @@ export async function createConnection(sessionId, { onQR, onStatusChange, onSock
 
     sock.ev.on('creds.update', saveCreds)
 
-    // Listen for incoming messages
     sock.ev.on('messages.upsert', async ({ messages, type }) => {
-        if (type === 'notify') {
-            for (const msg of messages) {
-                if (!msg.key.fromMe) {
-                    const jid = msg.key.remoteJid
-                    const isGroup = jid.endsWith('@g.us')
-                    const isNewsletter = jid.endsWith('@newsletter')
+        if (type !== 'notify') return
 
-                    // Filter: Ignore WhatsApp status updates
-                    if (jid === 'status@broadcast') {
-                        continue
-                    }
+        for (const msg of messages) {
+            if (msg.key.fromMe) continue
 
-                    // Extract minimal data needed for the webhook
-                    const data = {
-                        sessionId,
-                        from: jid,
-                        message: msg,
-                        isGroup,
-                        isNewsletter,
-                        // Helper to get text content easily
-                        content: msg.message?.conversation ||
-                            msg.message?.extendedTextMessage?.text ||
-                            msg.message?.imageMessage?.caption ||
-                            msg.message?.videoMessage?.caption ||
-                            ''
-                    }
+            const jid = msg.key.remoteJid
+            if (jid === 'status@broadcast') continue
 
-                    if (isNewsletter) {
-                        logger.info(`Session ${sessionId}: Newsletter message received from ${jid}`)
-                        triggerWebhook('newsletter.message', data)
-                    } else if (isGroup) {
-                        logger.info(`Session ${sessionId}: Group message received from ${jid}`)
-                        triggerWebhook('group.message', data)
-                    } else {
-                        logger.info(`Session ${sessionId}: Private message received from ${jid}`)
-                        triggerWebhook('message.upsert', data)
-                    }
-                }
+            const isGroup = jid.endsWith('@g.us')
+            const isNewsletter = jid.endsWith('@newsletter')
+
+            const data = {
+                sessionId,
+                from: jid,
+                message: msg,
+                isGroup,
+                isNewsletter,
+                content: msg.message?.conversation ||
+                    msg.message?.extendedTextMessage?.text ||
+                    msg.message?.imageMessage?.caption ||
+                    msg.message?.videoMessage?.caption ||
+                    ''
+            }
+
+            if (isNewsletter) {
+                logger.info(`Session ${sessionId}: Newsletter message from ${jid}`)
+                triggerWebhook('newsletter.message', data)
+            } else if (isGroup) {
+                logger.info(`Session ${sessionId}: Group message from ${jid}`)
+                triggerWebhook('group.message', data)
+            } else {
+                logger.info(`Session ${sessionId}: Private message from ${jid}`)
+                triggerWebhook('message.upsert', data)
             }
         }
     })
 
-    // Listen for group participants update (join, leave, etc)
-    sock.ev.on('group-participants.update', async (update) => {
-        logger.info(`Session ${sessionId}: Participants update for ${update.id} (Action: ${update.action})`)
-        triggerWebhook('group-participants.update', {
-            sessionId,
-            ...update
-        })
+    sock.ev.on('group-participants.update', (update) => {
+        logger.info(`Session ${sessionId}: Participants update for ${update.id} (${update.action})`)
+        triggerWebhook('group-participants.update', { sessionId, ...update })
     })
 
-    // Listen for message updates (delivery receipts, read receipts, etc)
-    sock.ev.on('messages.update', async (updates) => {
+    sock.ev.on('messages.update', (updates) => {
         for (const update of updates) {
-            if (update.update.status) {
-                logger.info(`Session ${sessionId}: Message status update for ${update.key.id}: ${update.update.status}`)
-                triggerWebhook('message.update', {
-                    sessionId,
-                    key: update.key,
-                    status: update.update.status,
-                    timestamp: update.update.messageTimestamp
-                })
-            }
+            if (!update.update.status) continue
+            logger.info(`Session ${sessionId}: Message status ${update.key.id}: ${update.update.status}`)
+            triggerWebhook('message.update', {
+                sessionId,
+                key: update.key,
+                status: update.update.status,
+                timestamp: update.update.messageTimestamp
+            })
         }
     })
 
@@ -131,7 +125,6 @@ export async function createConnection(sessionId, { onQR, onStatusChange, onSock
             if (shouldReconnect) {
                 const delay = Math.min(Math.pow(2, retryCount) * 1000, 30000)
                 logger.info(`Session ${sessionId}: Reconnecting in ${delay}ms... (Attempt ${retryCount + 1})`)
-
                 setTimeout(() => {
                     createConnection(sessionId, { onQR, onStatusChange, onSocket, onLogout }, retryCount + 1)
                 }, delay)

@@ -1,8 +1,8 @@
+import crypto from 'crypto'
 import logger from '../config/logger.js'
 
 export const authMiddleware = (req, res, next) => {
-    // Skip auth for Swagger UI if needed, but here we cover all routes
-    if (req.path === '/api-docs' || req.path.startsWith('/api-docs/')) {
+    if (req.path === '/api-docs' || req.path.startsWith('/api-docs/') || req.path === '/health') {
         return next()
     }
 
@@ -14,7 +14,8 @@ export const authMiddleware = (req, res, next) => {
         return next()
     }
 
-    if (apiKey !== validApiKey) {
+    if (!apiKey || apiKey.length !== validApiKey.length ||
+        !crypto.timingSafeEqual(Buffer.from(apiKey), Buffer.from(validApiKey))) {
         logger.warn(`Auth: Unauthorized access attempt from ${req.ip} (using ${apiKey ? 'invalid key' : 'no key'})`)
         return res.status(401).json({ error: 'Unauthorized: Invalid or missing API KEY' })
     }

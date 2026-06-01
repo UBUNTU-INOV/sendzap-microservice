@@ -1,6 +1,17 @@
 import * as sessionManager from '../services/session.manager.js'
 import logger from '../config/logger.js'
 
+// Baileys/WhatsApp expect backgroundColor as ARGB uint32, not a hex string
+function hexToArgb(hex) {
+    if (!hex || typeof hex !== 'string') return undefined
+    const clean = hex.replace('#', '')
+    if (clean.length !== 6) return undefined
+    const r = parseInt(clean.slice(0, 2), 16)
+    const g = parseInt(clean.slice(2, 4), 16)
+    const b = parseInt(clean.slice(4, 6), 16)
+    return ((0xFF << 24) | (r << 16) | (g << 8) | b) >>> 0
+}
+
 /**
  * Send a status/story update (text, image, video)
  */
@@ -35,13 +46,11 @@ export const sendStatus = async (req, res) => {
             case 'text':
             default:
                 payload = { text: message || caption || '' }
-                // Add background color and font for text stories if provided
-                if (backgroundColor) {
-                    payload.backgroundColor = backgroundColor
-                }
-                if (font !== undefined) {
-                    payload.font = font
-                }
+                // backgroundColor must be ARGB uint32 — convert hex string to int
+                const argb = hexToArgb(backgroundColor)
+                if (argb !== undefined) payload.backgroundColor = argb
+                // font must be an integer (0–5)
+                if (font !== undefined && font !== null) payload.font = parseInt(font, 10)
                 break
         }
 

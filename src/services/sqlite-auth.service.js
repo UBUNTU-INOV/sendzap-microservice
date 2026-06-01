@@ -10,7 +10,6 @@ if (!existsSync(SESSIONS_DIR)) {
 
 export const db = new Database('sessions/database.sqlite')
 
-// Initialisation de la table
 db.exec(`
     CREATE TABLE IF NOT EXISTS auth_state (
         session_id TEXT,
@@ -29,41 +28,35 @@ db.exec(`
         status TEXT DEFAULT 'pending',
         created_at INTEGER
     );
+
+    CREATE INDEX IF NOT EXISTS idx_webhook_queue_status_retry
+        ON webhook_queue(status, next_retry_at);
 `)
 
-/**
- * Implémentation d'un fournisseur d'état d'authentification SQLite pour Baileys
- */
+// Prepared statements instanciés une seule fois pour les performances
+const stmts = {
+    upsert: db.prepare(`INSERT OR REPLACE INTO auth_state (session_id, type, id, value) VALUES (?, ?, ?, ?)`),
+    select: db.prepare(`SELECT value FROM auth_state WHERE session_id = ? AND type = ? AND id = ?`),
+    delete: db.prepare(`DELETE FROM auth_state WHERE session_id = ? AND type = ? AND id = ?`),
+    deleteSession: db.prepare(`DELETE FROM auth_state WHERE session_id = ?`),
+    listSessions: db.prepare(`SELECT DISTINCT session_id FROM auth_state`),
+}
+
 export const useSqliteAuthState = async (sessionId) => {
     const writeData = (data, type, id) => {
-        const value = JSON.stringify(data, BufferJSON.replacer)
-        const stmt = db.prepare(`
-            INSERT OR REPLACE INTO auth_state (session_id, type, id, value)
-            VALUES (?, ?, ?, ?)
-        `)
-        stmt.run(sessionId, type, id, value)
+        stmts.upsert.run(sessionId, type, id, JSON.stringify(data, BufferJSON.replacer))
     }
 
     const readData = (type, id) => {
-        const stmt = db.prepare(`
-            SELECT value FROM auth_state WHERE session_id = ? AND type = ? AND id = ?
-        `)
-        const row = stmt.get(sessionId, type, id)
-        if (row) {
-            return JSON.parse(row.value, BufferJSON.reviver)
-        }
-        return null
+        const row = stmts.select.get(sessionId, type, id)
+        return row ? JSON.parse(row.value, BufferJSON.reviver) : null
     }
 
     const removeData = (type, id) => {
-        const stmt = db.prepare(`
-            DELETE FROM auth_state WHERE session_id = ? AND type = ? AND id = ?
-        `)
-        stmt.run(sessionId, type, id)
+        stmts.delete.run(sessionId, type, id)
     }
 
     const creds = readData('creds', 'main') || (() => {
-        // Tentative de migration depuis le système de fichiers (useMultiFileAuthState)
         try {
             const oldCredsPath = `./sessions/${sessionId}/creds.json`
             if (existsSync(oldCredsPath)) {
@@ -73,9 +66,8 @@ export const useSqliteAuthState = async (sessionId) => {
                 return data
             }
         } catch (error) {
-            logger.error(`Session ${sessionId}: Erreur lors de la migration des credentials:`, error)
+            logger.error(`Session ${sessionId}: Erreur migration credentials:`, error)
         }
-
         return initAuthCreds()
     })()
 
@@ -88,7 +80,6 @@ export const useSqliteAuthState = async (sessionId) => {
                     await Promise.all(
                         ids.map(async (id) => {
                             let value = readData(type, id)
-                            // Tentative de migration de la clé si absente de la DB
                             if (!value) {
                                 try {
                                     const oldKeyPath = `./sessions/${sessionId}/${type}-${id}.json`
@@ -98,7 +89,6 @@ export const useSqliteAuthState = async (sessionId) => {
                                     }
                                 } catch (e) { }
                             }
-
                             if (type === 'app-state-sync-key' && value) {
                                 value = proto.Message.AppStateSyncKeyData.fromObject(value)
                             }
@@ -127,18 +117,10 @@ export const useSqliteAuthState = async (sessionId) => {
     }
 }
 
-/**
- * Récupère tous les IDs de session stockés dans la base de données
- */
 export function getStoredSessionIds() {
-    const stmt = db.prepare('SELECT DISTINCT session_id FROM auth_state')
-    return stmt.all().map(row => row.session_id)
+    return stmts.listSessions.all().map(row => row.session_id)
 }
 
-/**
- * Supprime toutes les données associées à une session
- */
 export function deleteStoredSession(sessionId) {
-    const stmt = db.prepare('DELETE FROM auth_state WHERE session_id = ?')
-    stmt.run(sessionId)
+    stmts.deleteSession.run(sessionId)
 }

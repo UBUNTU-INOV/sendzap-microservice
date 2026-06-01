@@ -1,4 +1,5 @@
 import * as sessionManager from '../services/session.manager.js'
+import { normalizeJid, buildMediaPayload } from '../utils/whatsapp.utils.js'
 import logger from '../config/logger.js'
 
 export const sendMessage = async (req, res) => {
@@ -8,30 +9,18 @@ export const sendMessage = async (req, res) => {
     if (!session) {
         return res.status(404).json({ error: 'Session not found' })
     }
-
     if (session.status !== 'connected') {
         return res.status(400).json({ error: `Session is not connected (current status: ${session.status})` })
     }
 
-    // Heuristic to detect group JID if not provided
-    const isGroup = to.includes('-') || to.length > 15
-    const jid = to.includes('@') ? to : (isGroup ? `${to}@g.us` : `${to}@s.whatsapp.net`)
-
-    let payload = {}
-    if (mediaUrl) {
-        const content = { url: mediaUrl }
-        switch (mediaType) {
-            case 'image': payload = { image: content, caption: caption || message }; break
-            case 'video': payload = { video: content, caption: caption || message }; break
-            case 'audio': payload = { audio: content, ptt: false }; break
-            case 'document': payload = { document: content, fileName: fileName || 'file', caption: caption || message }; break
-            default: return res.status(400).json({ error: 'Invalid mediaType. Use image, video, audio, or document.' })
-        }
-    } else {
-        payload = { text: message }
+    const payload = buildMediaPayload({ message, mediaUrl, mediaType, fileName, caption })
+    if (!payload) {
+        return res.status(400).json({ error: 'Invalid mediaType. Use image, video, audio, or document.' })
     }
 
+    const jid = normalizeJid(to)
     const maxRetries = 2
+
     for (let i = 0; i <= maxRetries; i++) {
         try {
             const sentMsg = await session.sock.sendMessage(jid, payload)
@@ -39,7 +28,7 @@ export const sendMessage = async (req, res) => {
         } catch (error) {
             const isConnectionClose = error.message.includes('Connection Closed') || error.message.includes('Stream Errored')
             if (i < maxRetries && isConnectionClose) {
-                logger.warn(`SendMessage retry ${i + 1}/${maxRetries} for session ${sessionId} due to: ${error.message}`)
+                logger.warn(`SendMessage retry ${i + 1}/${maxRetries} for session ${sessionId}: ${error.message}`)
                 await new Promise(resolve => setTimeout(resolve, 1000))
                 continue
             }
@@ -51,7 +40,6 @@ export const sendMessage = async (req, res) => {
     }
 }
 
-// Helper to delay execution
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms))
 
 export const sendBulkMessage = async (req, res) => {
@@ -63,70 +51,37 @@ export const sendBulkMessage = async (req, res) => {
         }
 
         const session = sessionManager.getSession(sessionId)
-
         if (!session) {
             return res.status(404).json({ error: 'Session not found' })
         }
-
         if (session.status !== 'connected') {
             return res.status(400).json({ error: `Session is not connected (current status: ${session.status})` })
         }
 
-        const results = []
-
-        // Prepare payload once
-        let payload = {}
-        if (mediaUrl) {
-            const content = { url: mediaUrl }
-            switch (mediaType) {
-                case 'image':
-                    payload = { image: content, caption: caption || message }
-                    break
-                case 'video':
-                    payload = { video: content, caption: caption || message }
-                    break
-                case 'audio':
-                    payload = { audio: content, ptt: false }
-                    break
-                case 'document':
-                    payload = { document: content, fileName: fileName || 'file', caption: caption || message }
-                    break
-                default:
-                    return res.status(400).json({ error: 'Invalid mediaType for bulk send.' })
-            }
-        } else {
-            payload = { text: message }
+        const payload = buildMediaPayload({ message, mediaUrl, mediaType, fileName, caption })
+        if (!payload) {
+            return res.status(400).json({ error: 'Invalid mediaType for bulk send.' })
         }
 
-        // Process sequentially to respect delay and avoid blocking
-        // We will respond immediately saying "processing started" or wait? 
-        // For robustness, getting a job ID would be better, but for now we wait (up to a limit) or send background.
-        // Let's implement synchronous for small batches, but warning: big batches will timeout the HTTP request.
-        // Better approach: Start processing and return "bulk_queued" or process limited batch.
-
-        // Let's do it simply: Iterate and send. If list is huge (e.g. > 50), maybe user should handle batching.
-
-        for (const to of receivers) {
+        const results = []
+        for (let i = 0; i < receivers.length; i++) {
+            const to = receivers[i]
             try {
-                const isGroup = to.includes('-') || to.length > 15
-                const jid = to.includes('@') ? to : (isGroup ? `${to}@g.us` : `${to}@s.whatsapp.net`)
-
+                const jid = normalizeJid(to)
                 const sentMsg = await session.sock.sendMessage(jid, payload)
                 results.push({ to, status: 'sent', messageId: sentMsg.key.id })
-
-                if (receivers.indexOf(to) < receivers.length - 1) {
-                    await delay(delayMs)
-                }
             } catch (err) {
                 logger.error(`Failed to send to ${to}:`, err)
                 results.push({ to, status: 'failed', error: err.message })
             }
+            if (i < receivers.length - 1) {
+                await delay(delayMs)
+            }
         }
 
         res.json({ status: 'bulk_completed', results })
-
     } catch (error) {
-        logger.error(`Controller Error (sendBulkMessage):`, error)
+        logger.error('Controller Error (sendBulkMessage):', error)
         res.status(500).json({ error: error.message })
     }
 }
@@ -136,7 +91,7 @@ export const listGroups = async (req, res) => {
         const groups = await sessionManager.getGroups(req.params.sessionId)
         res.json(groups)
     } catch (error) {
-        logger.error(`Controller Error (listGroups):`, error)
+        logger.error('Controller Error (listGroups):', error)
         res.status(500).json({ error: error.message })
     }
 }
@@ -146,7 +101,7 @@ export const listContacts = async (req, res) => {
         const contacts = await sessionManager.getContacts(req.params.sessionId)
         res.json(contacts)
     } catch (error) {
-        logger.error(`Controller Error (listContacts):`, error)
+        logger.error('Controller Error (listContacts):', error)
         res.status(500).json({ error: error.message })
     }
 }
@@ -166,7 +121,7 @@ export const checkNumber = async (req, res) => {
             return res.status(400).json({ error: 'No connected session available' })
         }
 
-        const jid = number.includes('@') ? number : `${number}@s.whatsapp.net`
+        const jid = normalizeJid(number, 'private')
         const [result] = await session.sock.onWhatsApp(jid)
 
         if (!result || !result.exists) {
@@ -189,15 +144,9 @@ export const checkNumber = async (req, res) => {
             logger.debug(`Could not fetch status for ${result.jid}: ${e.message}`)
         }
 
-        res.json({
-            number,
-            exists: true,
-            jid: result.jid,
-            profilePictureUrl,
-            status
-        })
+        res.json({ number, exists: true, jid: result.jid, profilePictureUrl, status })
     } catch (error) {
-        logger.error(`Controller Error (checkNumber):`, error)
+        logger.error('Controller Error (checkNumber):', error)
         res.status(500).json({ error: error.message })
     }
 }
@@ -211,26 +160,16 @@ export const sendContact = async (req, res) => {
             return res.status(400).json({ error: 'Session not found or not connected' })
         }
 
-        const jid = to.includes('@') ? to : `${to}@s.whatsapp.net`
-
-        // Format a simple VCard
-        const vcard = 'BEGIN:VCARD\n' +
-            'VERSION:3.0\n' +
-            `FN:${contactName}\n` +
-            `ORG:${organization || ''};\n` +
-            `TEL;type=CELL;type=VOICE;waid=${contactNumber}:${contactNumber}\n` +
-            'END:VCARD'
+        const jid = normalizeJid(to, 'private')
+        const vcard = `BEGIN:VCARD\nVERSION:3.0\nFN:${contactName}\nORG:${organization || ''};\nTEL;type=CELL;type=VOICE;waid=${contactNumber}:${contactNumber}\nEND:VCARD`
 
         const sentMsg = await session.sock.sendMessage(jid, {
-            contacts: {
-                displayName: contactName,
-                contacts: [{ vcard }]
-            }
+            contacts: { displayName: contactName, contacts: [{ vcard }] }
         })
 
         res.json({ status: 'sent', messageId: sentMsg.key.id })
     } catch (error) {
-        logger.error(`Controller Error (sendContact):`, error)
+        logger.error('Controller Error (sendContact):', error)
         res.status(500).json({ error: error.message })
     }
 }
@@ -244,14 +183,12 @@ export const setTyping = async (req, res) => {
             return res.status(400).json({ error: 'Session not found or not connected' })
         }
 
-        const jid = to.includes('@') ? to : (to.includes('-') ? `${to}@g.us` : `${to}@s.whatsapp.net`)
-
-        // state: 'composing' | 'recording' | 'paused'
+        const jid = normalizeJid(to)
         await session.sock.sendPresenceUpdate(presence || 'composing', jid)
 
         res.json({ status: 'success' })
     } catch (error) {
-        logger.error(`Controller Error (setTyping):`, error)
+        logger.error('Controller Error (setTyping):', error)
         res.status(500).json({ error: error.message })
     }
 }

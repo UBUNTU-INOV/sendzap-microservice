@@ -18,6 +18,7 @@ import {
     validateListGroupsOrContacts,
     validateGroupParticipants,
     validateGroupInvite,
+    validateGroupInviteParams,
     validateGroupJoin,
     validateGroupSettings,
     validateGroupIdentity,
@@ -58,7 +59,7 @@ router.post('/set-typing', validateSetTyping, messageController.setTyping)
 router.post('/groups/participants/update', validateGroupParticipants, groupController.updateParticipants)
 router.post('/groups/participants/add', validateGroupParticipants, groupController.addParticipants)
 router.post('/groups/participants/remove', validateGroupParticipants, groupController.removeParticipants)
-router.get('/groups/invite-code/:sessionId/:groupId', validateGroupInvite, groupController.getInviteCode)
+router.get('/groups/invite-code/:sessionId/:groupId', validateGroupInviteParams, groupController.getInviteCode)
 router.post('/groups/revoke-invite', validateGroupInvite, groupController.revokeInviteCode)
 router.post('/groups/join-invite', validateGroupJoin, groupController.joinGroupViaInvite)
 router.post('/groups/settings', validateGroupSettings, groupController.updateGroupSettings)
