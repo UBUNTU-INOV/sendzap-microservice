@@ -14,7 +14,7 @@ export const db = new Database('sessions/database.sqlite')
 // Essential for 100+ sessions writing credentials simultaneously
 db.pragma('journal_mode = WAL')
 db.pragma('synchronous = NORMAL')   // safe with WAL, much faster than FULL
-db.pragma('cache_size = -65536')    // 64MB in-memory page cache
+db.pragma('cache_size = -32768')    // 32MB in-memory page cache (fits 6GB server)
 db.pragma('temp_store = MEMORY')    // temp tables in RAM
 db.pragma('mmap_size = 268435456')  // 256MB memory-mapped I/O
 db.pragma('busy_timeout = 5000')    // wait up to 5s on lock instead of failing

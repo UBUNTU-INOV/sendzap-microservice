@@ -12,5 +12,5 @@ RUN mkdir -p sessions
 
 EXPOSE 3000
 
-# 6GB heap for 100 active sessions (~50MB each + runtime overhead)
-CMD ["node", "--max-old-space-size=6144", "index.js"]
+# 3.5GB heap — 100 sessions x ~30MB + runtime overhead, fits in 6GB server
+CMD ["node", "--max-old-space-size=3584", "index.js"]
