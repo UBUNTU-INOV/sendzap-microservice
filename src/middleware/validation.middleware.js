@@ -34,7 +34,7 @@ export const validateSendMessage = validate(Joi.object({
 export const validateSendBulk = validate(Joi.object({
     sessionId: sessionIdSchema,
     receivers: Joi.array().items(phoneSchema).min(1).required(),
-    message: Joi.string().max(4096).required(),
+    message: Joi.string().allow('').max(4096).optional(),
     mediaUrl: Joi.string().uri().optional(),
     mediaType: Joi.string().valid('image', 'video', 'audio', 'document').optional(),
     fileName: Joi.string().max(255).optional(),
@@ -77,6 +77,12 @@ export const validateGroupInvite = validate(Joi.object({
     groupId: Joi.string().required()
 }))
 
+// Variant pour les routes GET qui passent sessionId/groupId en params
+export const validateGroupInviteParams = validate(Joi.object({
+    sessionId: sessionIdSchema,
+    groupId: Joi.string().required()
+}), 'params')
+
 export const validateGroupJoin = validate(Joi.object({
     sessionId: sessionIdSchema,
     code: Joi.string().required()
@@ -113,7 +119,7 @@ export const validateDeleteStatus = validate(Joi.object({
 export const validateGroupCreate = validate(Joi.object({
     sessionId: sessionIdSchema,
     subject: Joi.string().min(1).max(100).required(),
-    participants: Joi.array().items(phoneSchema).optional().default([])
+    participants: Joi.array().items(Joi.string().min(5).max(30)).optional().default([])
 }))
 
 export const validateGroupMetadata = validate(Joi.object({

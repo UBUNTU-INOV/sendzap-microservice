@@ -1,9 +1,6 @@
-FROM node:20-slim
+FROM node:20-alpine
 
 WORKDIR /app
-
-# Install dependencies needed for some native modules if any (baileys might need some)
-# RUN apt-get update && apt-get install -y python3 make g++ && rm -rf /var/lib/apt/lists/*
 
 COPY package*.json ./
 
@@ -11,9 +8,9 @@ RUN npm install --production
 
 COPY . .
 
-# Ensure sessions directory exists
 RUN mkdir -p sessions
 
 EXPOSE 3000
 
-CMD ["node", "--max-old-space-size=128", "index.js"]
+# 512MB est un bon équilibre pour 3-5 sessions actives
+CMD ["node", "--max-old-space-size=512", "index.js"]

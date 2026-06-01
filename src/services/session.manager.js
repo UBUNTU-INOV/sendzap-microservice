@@ -4,7 +4,6 @@ import { readdirSync, existsSync } from 'fs'
 import logger from '../config/logger.js'
 
 const sessions = new Map()
-const knownSessions = new Set()
 const SESSIONS_DIR = './sessions'
 
 export async function initSessions() {
@@ -16,13 +15,18 @@ export async function initSessions() {
 
     const dbSessions = getStoredSessionIds()
 
-    // Fusionner les dossiers et les sessions DB (sans doublons)
     const allSessionIds = Array.from(new Set([...folderSessions, ...dbSessions]))
 
-    logger.info(`Found ${allSessionIds.length} sessions (${folderSessions.length} folders, ${dbSessions.length} in DB). Registered for lazy loading.`)
+    if (allSessionIds.length === 0) return
 
+    logger.info(`Found ${allSessionIds.length} session(s). Starting reconnection in background...`)
+
+    // Start all sessions immediately in parallel — don't await, let them reconnect
+    // while the HTTP server is already accepting requests
     for (const sessionId of allSessionIds) {
-        knownSessions.add(sessionId)
+        createSession(sessionId).catch(err => {
+            logger.error(`Failed to auto-start session ${sessionId}:`, err)
+        })
     }
 }
 
@@ -30,8 +34,6 @@ export async function createSession(sessionId) {
     if (sessions.has(sessionId)) {
         return sessions.get(sessionId)
     }
-
-    knownSessions.delete(sessionId)
 
     const session = {
         id: sessionId,
@@ -75,19 +77,7 @@ export async function createSession(sessionId) {
 }
 
 export function getSession(sessionId) {
-    if (sessions.has(sessionId)) {
-        return sessions.get(sessionId)
-    }
-
-    if (knownSessions.has(sessionId)) {
-        logger.info(`Session ${sessionId}: Lazy initializing...`)
-        // Start initialization but don't await it here as getSession is expected to be sync by callers
-        // Returning the initial session object allows callers to see 'initializing' status
-        createSession(sessionId)
-        return sessions.get(sessionId)
-    }
-
-    return null
+    return sessions.get(sessionId) || null
 }
 
 export function getAllSessions() {
@@ -102,6 +92,20 @@ export function getFirstConnectedSession() {
     return Array.from(sessions.values()).find(s => s.status === 'connected')
 }
 
+// Called on server shutdown — closes socket without logging out WhatsApp
+// SQLite credentials are preserved so the session reconnects on next start
+export async function closeSession(sessionId) {
+    const session = sessions.get(sessionId)
+    if (session?.sock) {
+        try {
+            session.sock.ev.removeAllListeners()
+            session.sock.end()
+        } catch (_) {}
+    }
+    sessions.delete(sessionId)
+}
+
+// Called on explicit user action — logs out from WhatsApp AND wipes SQLite
 export async function deleteSession(sessionId) {
     const session = sessions.get(sessionId)
     if (session) {

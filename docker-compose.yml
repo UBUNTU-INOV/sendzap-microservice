@@ -6,9 +6,12 @@ services:
     ports:
       - "${PORT:-3000}:3000"
     environment:
+      - NODE_ENV=production
       - PORT=3000
       - API_KEY=${API_KEY}
       - WEBHOOK_URL=${WEBHOOK_URL}
+      - WEBHOOK_SECRET=${WEBHOOK_SECRET}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
     volumes:
       - ./sessions:/app/sessions
     restart: always
