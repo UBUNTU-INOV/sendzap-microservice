@@ -19,15 +19,25 @@ export async function initSessions() {
 
     if (allSessionIds.length === 0) return
 
-    logger.info(`Found ${allSessionIds.length} session(s). Starting reconnection in background...`)
+    logger.info(`Found ${allSessionIds.length} session(s). Starting in batches to avoid IP rate limits...`)
 
-    // Start all sessions immediately in parallel — don't await, let them reconnect
-    // while the HTTP server is already accepting requests
-    for (const sessionId of allSessionIds) {
-        createSession(sessionId).catch(err => {
-            logger.error(`Failed to auto-start session ${sessionId}:`, err)
-        })
+    // Start sessions in batches of 5 with 3s between batches.
+    // Avoids opening 100 WebSocket connections simultaneously which triggers WhatsApp IP bans.
+    const BATCH_SIZE = 5
+    const BATCH_DELAY_MS = 3000
+
+    for (let i = 0; i < allSessionIds.length; i++) {
+        const sessionId = allSessionIds[i]
+        const delay = Math.floor(i / BATCH_SIZE) * BATCH_DELAY_MS
+        setTimeout(() => {
+            createSession(sessionId).catch(err => {
+                logger.error(`Failed to auto-start session ${sessionId}:`, err)
+            })
+        }, delay)
     }
+
+    const totalTime = Math.floor(allSessionIds.length / BATCH_SIZE) * (BATCH_DELAY_MS / 1000)
+    logger.info(`All ${allSessionIds.length} sessions will be started over ~${totalTime}s`)
 }
 
 export async function createSession(sessionId) {

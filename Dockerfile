@@ -12,5 +12,5 @@ RUN mkdir -p sessions
 
 EXPOSE 3000
 
-# 512MB est un bon équilibre pour 3-5 sessions actives
-CMD ["node", "--max-old-space-size=512", "index.js"]
+# 6GB heap for 100 active sessions (~50MB each + runtime overhead)
+CMD ["node", "--max-old-space-size=6144", "index.js"]
