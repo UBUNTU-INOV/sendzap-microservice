@@ -13,8 +13,24 @@ const validate = (schema, property = 'body') => {
 }
 
 // Common schemas
-const sessionIdSchema = Joi.string().pattern(/^[a-zA-Z0-9_-]+$/).min(3).max(50).required()
-const phoneSchema = Joi.string().min(5).max(20).required()
+const sessionIdSchema = Joi.string()
+    .pattern(/^[a-zA-Z0-9_-]+$/)
+    .min(3).max(50).required()
+    .custom((value, helpers) => {
+        // Block null bytes and control characters (path traversal guard)
+        if (/[\x00-\x1f\x7f]/.test(value)) return helpers.error('string.base')
+        // Block prototype pollution keywords
+        if (['__proto__', 'constructor', 'prototype'].includes(value)) return helpers.error('string.base')
+        return value
+    })
+
+const phoneSchema = Joi.string().min(5).max(30).required()
+
+// mediaUrl restricted to http/https only (blocks file://, javascript:, gopher://)
+const mediaUrlSchema = Joi.string()
+    .uri({ scheme: ['http', 'https'] })
+    .max(2048)
+    .optional()
 
 // Endpoint schemas
 export const validateSessionId = validate(Joi.object({
@@ -25,21 +41,22 @@ export const validateSendMessage = validate(Joi.object({
     sessionId: sessionIdSchema,
     to: phoneSchema,
     message: Joi.string().max(4096).optional(),
-    mediaUrl: Joi.string().uri().optional(),
+    mediaUrl: mediaUrlSchema,
     mediaType: Joi.string().valid('image', 'video', 'audio', 'document').optional(),
-    fileName: Joi.string().max(255).optional(),
+    fileName: Joi.string().max(255).pattern(/^[^/\\<>:"|?*\x00-\x1f]+$/).optional(),
     caption: Joi.string().max(1024).optional()
 }))
 
 export const validateSendBulk = validate(Joi.object({
     sessionId: sessionIdSchema,
-    receivers: Joi.array().items(phoneSchema).min(1).required(),
+    receivers: Joi.array().items(phoneSchema).min(1).max(500).required(),
     message: Joi.string().allow('').max(4096).optional(),
-    mediaUrl: Joi.string().uri().optional(),
+    mediaUrl: mediaUrlSchema,
     mediaType: Joi.string().valid('image', 'video', 'audio', 'document').optional(),
-    fileName: Joi.string().max(255).optional(),
+    fileName: Joi.string().max(255).pattern(/^[^/\\<>:"|?*\x00-\x1f]+$/).optional(),
     caption: Joi.string().max(1024).optional(),
     delayMs: Joi.number().integer().min(100).max(10000).default(1000)
+        .custom((v, h) => Number.isFinite(v) ? v : h.error('number.base'))
 }))
 
 export const validateCheckNumber = validate(Joi.object({
@@ -103,7 +120,7 @@ export const validateGroupIdentity = validate(Joi.object({
 
 export const validateSendStatus = validate(Joi.object({
     sessionId: sessionIdSchema,
-    mediaUrl: Joi.string().uri().optional(),
+    mediaUrl: mediaUrlSchema,
     mediaType: Joi.string().valid('image', 'video', 'audio', 'text').default('text'),
     message: Joi.string().max(4096).optional(),
     caption: Joi.string().max(1024).optional(),
@@ -148,7 +165,7 @@ export const validateChannelSend = validate(Joi.object({
     sessionId: sessionIdSchema,
     channelId: Joi.string().required(),
     message: Joi.string().max(4096).optional(),
-    mediaUrl: Joi.string().uri().optional(),
+    mediaUrl: mediaUrlSchema,
     mediaType: Joi.string().valid('image', 'video', 'audio', 'document').optional(),
     caption: Joi.string().max(1024).optional()
 }))

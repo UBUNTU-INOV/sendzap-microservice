@@ -49,55 +49,67 @@ export async function createConnection(sessionId, { onQR, onStatusChange, onSock
         if (type !== 'notify') return
 
         for (const msg of messages) {
-            if (msg.key.fromMe) continue
+            try {
+                if (msg.key.fromMe) continue
 
-            const jid = msg.key.remoteJid
-            if (jid === 'status@broadcast') continue
+                const jid = msg.key.remoteJid
+                if (jid === 'status@broadcast') continue
 
-            const isGroup = jid.endsWith('@g.us')
-            const isNewsletter = jid.endsWith('@newsletter')
+                const isGroup = jid.endsWith('@g.us')
+                const isNewsletter = jid.endsWith('@newsletter')
 
-            const data = {
-                sessionId,
-                from: jid,
-                message: msg,
-                isGroup,
-                isNewsletter,
-                content: msg.message?.conversation ||
-                    msg.message?.extendedTextMessage?.text ||
-                    msg.message?.imageMessage?.caption ||
-                    msg.message?.videoMessage?.caption ||
-                    ''
-            }
+                const data = {
+                    sessionId,
+                    from: jid,
+                    message: msg,
+                    isGroup,
+                    isNewsletter,
+                    content: msg.message?.conversation ||
+                        msg.message?.extendedTextMessage?.text ||
+                        msg.message?.imageMessage?.caption ||
+                        msg.message?.videoMessage?.caption ||
+                        ''
+                }
 
-            if (isNewsletter) {
-                logger.info(`Session ${sessionId}: Newsletter message from ${jid}`)
-                triggerWebhook('newsletter.message', data)
-            } else if (isGroup) {
-                logger.info(`Session ${sessionId}: Group message from ${jid}`)
-                triggerWebhook('group.message', data)
-            } else {
-                logger.info(`Session ${sessionId}: Private message from ${jid}`)
-                triggerWebhook('message.upsert', data)
+                if (isNewsletter) {
+                    logger.info(`Session ${sessionId}: Newsletter message from ${jid}`)
+                    triggerWebhook('newsletter.message', data)
+                } else if (isGroup) {
+                    logger.info(`Session ${sessionId}: Group message from ${jid}`)
+                    triggerWebhook('group.message', data)
+                } else {
+                    logger.info(`Session ${sessionId}: Private message from ${jid}`)
+                    triggerWebhook('message.upsert', data)
+                }
+            } catch (err) {
+                logger.error(`Session ${sessionId}: Error processing message event:`, err)
             }
         }
     })
 
     sock.ev.on('group-participants.update', (update) => {
-        logger.info(`Session ${sessionId}: Participants update for ${update.id} (${update.action})`)
-        triggerWebhook('group-participants.update', { sessionId, ...update })
+        try {
+            logger.info(`Session ${sessionId}: Participants update for ${update.id} (${update.action})`)
+            triggerWebhook('group-participants.update', { sessionId, ...update })
+        } catch (err) {
+            logger.error(`Session ${sessionId}: Error processing group-participants event:`, err)
+        }
     })
 
     sock.ev.on('messages.update', (updates) => {
         for (const update of updates) {
-            if (!update.update.status) continue
-            logger.info(`Session ${sessionId}: Message status ${update.key.id}: ${update.update.status}`)
-            triggerWebhook('message.update', {
-                sessionId,
-                key: update.key,
-                status: update.update.status,
-                timestamp: update.update.messageTimestamp
-            })
+            try {
+                if (!update.update.status) continue
+                logger.info(`Session ${sessionId}: Message status ${update.key.id}: ${update.update.status}`)
+                triggerWebhook('message.update', {
+                    sessionId,
+                    key: update.key,
+                    status: update.update.status,
+                    timestamp: update.update.messageTimestamp
+                })
+            } catch (err) {
+                logger.error(`Session ${sessionId}: Error processing message.update event:`, err)
+            }
         }
     })
 

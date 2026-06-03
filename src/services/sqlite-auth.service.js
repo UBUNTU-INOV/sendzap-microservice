@@ -1,7 +1,21 @@
 import Database from 'better-sqlite3'
 import { BufferJSON, initAuthCreds, proto } from '@whiskeysockets/baileys'
 import { existsSync, mkdirSync, readFileSync } from 'fs'
+import { resolve, join } from 'path'
 import logger from '../config/logger.js'
+
+// Validates sessionId and returns a safe resolved path — throws if traversal detected
+function safeSessionPath(sessionId) {
+    if (!sessionId || !/^[a-zA-Z0-9_-]+$/.test(sessionId)) {
+        throw new Error(`Invalid sessionId: ${sessionId}`)
+    }
+    const base = resolve(SESSIONS_DIR)
+    const full = resolve(join(base, sessionId))
+    if (!full.startsWith(base + '/') && full !== base) {
+        throw new Error(`Path traversal attempt detected for sessionId: ${sessionId}`)
+    }
+    return full
+}
 
 const SESSIONS_DIR = './sessions'
 if (!existsSync(SESSIONS_DIR)) {
@@ -16,7 +30,7 @@ db.pragma('journal_mode = WAL')
 db.pragma('synchronous = NORMAL')   // safe with WAL, much faster than FULL
 db.pragma('cache_size = -32768')    // 32MB in-memory page cache (fits 6GB server)
 db.pragma('temp_store = MEMORY')    // temp tables in RAM
-db.pragma('mmap_size = 268435456')  // 256MB memory-mapped I/O
+db.pragma('mmap_size = 268435456')  // 256MB memory-mappeds I/O
 db.pragma('busy_timeout = 5000')    // wait up to 5s on lock instead of failing
 
 db.exec(`
@@ -67,7 +81,7 @@ export const useSqliteAuthState = async (sessionId) => {
 
     const creds = readData('creds', 'main') || (() => {
         try {
-            const oldCredsPath = `./sessions/${sessionId}/creds.json`
+            const oldCredsPath = `${safeSessionPath(sessionId)}/creds.json`
             if (existsSync(oldCredsPath)) {
                 const data = JSON.parse(readFileSync(oldCredsPath, 'utf-8'), BufferJSON.reviver)
                 writeData(data, 'creds', 'main')
@@ -91,7 +105,7 @@ export const useSqliteAuthState = async (sessionId) => {
                             let value = readData(type, id)
                             if (!value) {
                                 try {
-                                    const oldKeyPath = `./sessions/${sessionId}/${type}-${id}.json`
+                                    const oldKeyPath = `${safeSessionPath(sessionId)}/${type}-${id}.json`
                                     if (existsSync(oldKeyPath)) {
                                         value = JSON.parse(readFileSync(oldKeyPath, 'utf-8'), BufferJSON.reviver)
                                         writeData(value, type, id)

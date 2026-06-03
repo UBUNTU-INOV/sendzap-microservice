@@ -2,6 +2,12 @@ import * as sessionManager from '../services/session.manager.js'
 import { normalizeJid, buildMediaPayload } from '../utils/whatsapp.utils.js'
 import logger from '../config/logger.js'
 
+// Strips VCARD-dangerous characters (newlines, semicolons) to prevent injection
+function escapeVCard(value) {
+    if (!value) return ''
+    return String(value).replace(/[\r\n;,\\]/g, '').slice(0, 100)
+}
+
 export const sendMessage = async (req, res) => {
     const { sessionId, to, message, mediaUrl, mediaType, fileName, caption } = req.body
     const session = sessionManager.getSession(sessionId)
@@ -161,7 +167,7 @@ export const sendContact = async (req, res) => {
         }
 
         const jid = normalizeJid(to, 'private')
-        const vcard = `BEGIN:VCARD\nVERSION:3.0\nFN:${contactName}\nORG:${organization || ''};\nTEL;type=CELL;type=VOICE;waid=${contactNumber}:${contactNumber}\nEND:VCARD`
+        const vcard = `BEGIN:VCARD\nVERSION:3.0\nFN:${escapeVCard(contactName)}\nORG:${escapeVCard(organization)};\nTEL;type=CELL;type=VOICE;waid=${escapeVCard(contactNumber)}:${escapeVCard(contactNumber)}\nEND:VCARD`
 
         const sentMsg = await session.sock.sendMessage(jid, {
             contacts: { displayName: contactName, contacts: [{ vcard }] }

@@ -10,8 +10,8 @@ export const authMiddleware = (req, res, next) => {
     const validApiKey = process.env.API_KEY
 
     if (!validApiKey) {
-        logger.warn('Auth: API_KEY not set in environment. Allowing request (INSECURE).')
-        return next()
+        logger.error('FATAL: API_KEY environment variable is not set. Refusing all requests.')
+        return res.status(500).json({ error: 'Server misconfiguration: API_KEY not set' })
     }
 
     if (!apiKey || apiKey.length !== validApiKey.length ||

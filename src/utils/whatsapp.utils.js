@@ -4,12 +4,17 @@
  * @param {'private'|'group'|'newsletter'} [hint] - Type forcé si connu
  */
 export function normalizeJid(id, hint) {
+    if (!id || typeof id !== 'string') throw new Error('Invalid JID: must be a non-empty string')
+
+    // Block prototype pollution keywords
+    const dangerous = ['__proto__', 'constructor', 'prototype', 'toString', 'valueOf']
+    if (dangerous.includes(id.toLowerCase())) throw new Error('Invalid JID: reserved keyword')
+
     if (id.includes('@')) return id
 
     if (hint === 'group') return `${id}@g.us`
     if (hint === 'newsletter') return `${id}@newsletter`
 
-    // Heuristique : numéro avec tiret ou > 15 chars → groupe
     const isGroup = id.includes('-') || id.length > 15
     return isGroup ? `${id}@g.us` : `${id}@s.whatsapp.net`
 }

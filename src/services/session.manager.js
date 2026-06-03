@@ -4,6 +4,7 @@ import { readdirSync, existsSync } from 'fs'
 import logger from '../config/logger.js'
 
 const sessions = new Map()
+const sessionLocks = new Map()  // prevents concurrent creation of same session
 const SESSIONS_DIR = './sessions'
 
 export async function initSessions() {
@@ -41,6 +42,25 @@ export async function initSessions() {
 }
 
 export async function createSession(sessionId) {
+    if (sessions.has(sessionId)) {
+        return sessions.get(sessionId)
+    }
+
+    // Return in-progress promise if another call is already creating this session
+    if (sessionLocks.has(sessionId)) {
+        return sessionLocks.get(sessionId)
+    }
+
+    const creationPromise = _doCreateSession(sessionId)
+    sessionLocks.set(sessionId, creationPromise)
+    try {
+        return await creationPromise
+    } finally {
+        sessionLocks.delete(sessionId)
+    }
+}
+
+async function _doCreateSession(sessionId) {
     if (sessions.has(sessionId)) {
         return sessions.get(sessionId)
     }
