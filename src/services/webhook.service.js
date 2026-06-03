@@ -11,13 +11,16 @@ if (WEBHOOK_URL && !WEBHOOK_SECRET) {
 }
 
 const MAX_ATTEMPTS = 5
-const RECHECK_INTERVAL = 3000  // faster processing under high message volume
-const BATCH_SIZE = 20           // process more webhooks per tick with 100 sessions
+const RECHECK_INTERVAL = 3000
+const BATCH_SIZE = 20
 const FAILED_TTL_MS = 7 * 24 * 60 * 60 * 1000
+// Drop new webhooks when queue is full to prevent SQLite file growing without bound
+const MAX_QUEUE_SIZE = parseInt(process.env.MAX_WEBHOOK_QUEUE || '10000', 10)
 
 const stmts = {
     insert: db.prepare(`INSERT INTO webhook_queue (event, payload, next_retry_at, created_at) VALUES (?, ?, ?, ?)`),
     pending: db.prepare(`SELECT * FROM webhook_queue WHERE status = 'pending' AND next_retry_at <= ? ORDER BY created_at ASC LIMIT ?`),
+    queueSize: db.prepare(`SELECT COUNT(*) as count FROM webhook_queue WHERE status = 'pending'`),
     delete: db.prepare(`DELETE FROM webhook_queue WHERE id = ?`),
     markFailed: db.prepare(`UPDATE webhook_queue SET status = 'failed', attempts = ? WHERE id = ?`),
     retry: db.prepare(`UPDATE webhook_queue SET attempts = ?, next_retry_at = ? WHERE id = ?`),
@@ -31,6 +34,13 @@ const calculateSignature = (payload) => {
 
 export const triggerWebhook = (event, data) => {
     if (!WEBHOOK_URL) return
+
+    // Drop event if queue is full — protects SQLite and memory from unbounded growth
+    const { count } = stmts.queueSize.get()
+    if (count >= MAX_QUEUE_SIZE) {
+        logger.warn(`Webhook queue full (${count}/${MAX_QUEUE_SIZE}). Dropping event: ${event}`)
+        return
+    }
 
     const payload = { event, timestamp: new Date().toISOString(), data }
     try {

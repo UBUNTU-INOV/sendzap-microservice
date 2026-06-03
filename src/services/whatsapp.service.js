@@ -18,7 +18,18 @@ async function getVersion() {
     return cachedVersion
 }
 
+// Track active WebSocket connections to WhatsApp — prevents resource exhaustion
+const MAX_CONNECTIONS = parseInt(process.env.MAX_WA_CONNECTIONS || '100', 10)
+let activeConnections = 0
+
 export async function createConnection(sessionId, { onQR, onStatusChange, onSocket, onLogout }, retryCount = 0) {
+    if (activeConnections >= MAX_CONNECTIONS) {
+        throw new Error(`Max concurrent WhatsApp connections reached (${MAX_CONNECTIONS}). Try again later.`)
+    }
+
+    activeConnections++
+    logger.debug(`Session ${sessionId}: Connection opened (${activeConnections}/${MAX_CONNECTIONS} active)`)
+
     const { state, saveCreds } = await useSqliteAuthState(sessionId)
     const version = await getVersion()
 
@@ -130,6 +141,9 @@ export async function createConnection(sessionId, { onQR, onStatusChange, onSock
         }
 
         if (connection === 'close') {
+            activeConnections = Math.max(0, activeConnections - 1)
+            logger.debug(`Session ${sessionId}: Connection closed (${activeConnections}/${MAX_CONNECTIONS} active)`)
+
             const statusCode = lastDisconnect?.error?.output?.statusCode || lastDisconnect?.error?.code
             const shouldReconnect = statusCode !== DisconnectReason.loggedOut && statusCode !== 401
 
