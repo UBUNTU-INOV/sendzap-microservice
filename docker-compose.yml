@@ -14,6 +14,22 @@ services:
       - WEBHOOK_URL=${WEBHOOK_URL}
       - WEBHOOK_SECRET=${WEBHOOK_SECRET}
       - LOG_LEVEL=${LOG_LEVEL:-info}
+      - MAX_WA_CONNECTIONS=${MAX_WA_CONNECTIONS:-100}
+      - MAX_WEBHOOK_QUEUE=${MAX_WEBHOOK_QUEUE:-10000}
     volumes:
-      - ./sessions:/app/sessions
+      # Named volume — persists across redeployments, image rebuilds, and container restarts.
+      # Docker never deletes named volumes automatically (unlike bind mounts).
+      # On Coolify: configure a Persistent Storage pointing to /app/sessions in the UI,
+      # OR keep this named volume — Coolify respects docker-compose volumes.
+      - sessions_data:/app/sessions
     restart: always
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+# Named volume managed by Docker — survives container recreation and redeployments
+volumes:
+  sessions_data:
