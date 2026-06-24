@@ -16,7 +16,7 @@ export const listChannels = async (req, res) => {
         const session = getConnectedSession(req.params.sessionId, res)
         if (!session) return
 
-        const newsletters = await session.sock.newsletterGetSubscribed()
+        const newsletters = await session.sock.newsletterSubscribed()
 
         res.json({
             status: 'success',
@@ -59,11 +59,11 @@ export const createChannel = async (req, res) => {
 
 export const sendChannelMessage = async (req, res) => {
     try {
-        const { sessionId, channelId, message, mediaUrl, mediaType, caption } = req.body
+        const { sessionId, channelId, message, mediaUrl, mediaType, caption, fileName } = req.body
         const session = getConnectedSession(sessionId, res)
         if (!session) return
 
-        const payload = buildMediaPayload({ message, mediaUrl, mediaType, caption })
+        const payload = buildMediaPayload({ message, mediaUrl, mediaType, caption, fileName })
         if (!payload) {
             return res.status(400).json({ error: 'Invalid mediaType. Use image, video, audio, or document.' })
         }
@@ -140,7 +140,12 @@ export const muteChannel = async (req, res) => {
         const session = getConnectedSession(sessionId, res)
         if (!session) return
 
-        await session.sock.newsletterMute(normalizeJid(channelId, 'newsletter'), mute !== false)
+        const jid = normalizeJid(channelId, 'newsletter')
+        if (mute !== false) {
+            await session.sock.newsletterMute(jid)
+        } else {
+            await session.sock.newsletterUnmute(jid)
+        }
         res.json({ status: 'success', message: mute !== false ? 'Channel muted' : 'Channel unmuted' })
     } catch (error) {
         logger.error('Controller Error (muteChannel):', error)

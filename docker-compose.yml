@@ -14,8 +14,8 @@ services:
       - WEBHOOK_URL=${WEBHOOK_URL}
       - WEBHOOK_SECRET=${WEBHOOK_SECRET}
       - LOG_LEVEL=${LOG_LEVEL:-info}
-      - MAX_WA_CONNECTIONS=${MAX_WA_CONNECTIONS:-100}
-      - MAX_WEBHOOK_QUEUE=${MAX_WEBHOOK_QUEUE:-10000}
+      - MAX_WA_CONNECTIONS=${MAX_WA_CONNECTIONS:-120}
+      - MAX_WEBHOOK_QUEUE=${MAX_WEBHOOK_QUEUE:-15000}
     volumes:
       # Named volume — persists across redeployments, image rebuilds, and container restarts.
       # Docker never deletes named volumes automatically (unlike bind mounts).

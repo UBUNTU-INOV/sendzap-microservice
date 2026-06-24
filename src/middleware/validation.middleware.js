@@ -245,8 +245,9 @@ export const validateChannelSend = validate(Joi.object({
     message: Joi.string().max(4096).optional(),
     mediaUrl: mediaUrlSchema,
     mediaType: Joi.string().valid('image', 'video', 'audio', 'document').optional(),
-    caption: Joi.string().max(1024).optional()
-}))
+    caption: Joi.string().max(1024).optional(),
+    fileName: Joi.string().max(255).optional()
+}).or('message', 'mediaUrl'))
 
 export const validateChannelInfo = validate(Joi.object({
     sessionId: sessionIdSchema,
