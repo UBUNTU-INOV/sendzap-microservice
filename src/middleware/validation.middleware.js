@@ -97,6 +97,7 @@ export const validateSendTemplateButtons = validate(Joi.object({
     to: phoneSchema,
     text: Joi.string().max(1024).required(),
     footer: Joi.string().max(256).optional(),
+    imageUrl: Joi.string().uri({ scheme: ['http', 'https'] }).max(2048).optional(),
     optionText: Joi.string().max(50).optional(),
     optionTitle: Joi.string().max(50).optional(),
     buttons: Joi.array().items(Joi.alternatives().try(

@@ -198,7 +198,10 @@ export const sendTemplateButtons = async (req, res) => {
         })
 
         const jid = normalizeJid(to, 'private')
-        const payload = { text, footer: footer ?? '', nativeFlow }
+        const { imageUrl } = req.body
+        const payload = imageUrl
+            ? { image: { url: imageUrl }, caption: text, footer: footer ?? '', nativeFlow }
+            : { text, footer: footer ?? '', nativeFlow }
         if (optionText) {
             payload.optionText = optionText
             payload.optionTitle = optionTitle || 'Options'
