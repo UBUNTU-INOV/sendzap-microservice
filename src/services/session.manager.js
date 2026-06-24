@@ -70,6 +70,7 @@ async function _doCreateSession(sessionId) {
         sock: null,
         qr: null,
         status: 'initializing',
+        contactJids: new Set(),
     }
 
     sessions.set(sessionId, session)
@@ -89,6 +90,9 @@ async function _doCreateSession(sessionId) {
                 },
                 onSocket: (sock) => {
                     session.sock = sock
+                },
+                onContacts: (jids) => {
+                    for (const jid of jids) session.contactJids.add(jid)
                 },
                 onLogout: () => {
                     deleteStoredSession(sessionId)

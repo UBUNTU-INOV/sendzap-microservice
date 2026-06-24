@@ -17,14 +17,13 @@ function hexToArgb(hex) {
  */
 export const sendStatus = async (req, res) => {
     try {
-        const { sessionId, mediaUrl, mediaType, message, caption, backgroundColor, font } = req.body
+        const { sessionId, mediaUrl, mediaType, message, caption, backgroundColor, font, statusJidList: bodyJidList } = req.body
         const session = sessionManager.getSession(sessionId)
 
         if (!session || session.status !== 'connected') {
             return res.status(400).json({ error: 'Session not found or not connected' })
         }
 
-        const jid = 'status@broadcast'
         let payload = {}
 
         switch (mediaType) {
@@ -46,17 +45,27 @@ export const sendStatus = async (req, res) => {
             case 'text':
             default:
                 payload = { text: message || caption || '' }
-                // backgroundColor must be ARGB uint32 — convert hex string to int
                 const argb = hexToArgb(backgroundColor)
                 if (argb !== undefined) payload.backgroundColor = argb
-                // font must be an integer (0–5)
                 if (font !== undefined && font !== null) payload.font = parseInt(font, 10)
                 break
         }
 
-        const sentMsg = await session.sock.sendMessage(jid, payload)
+        const rawOwnJid = session.sock.user?.id || ''
+        const ownJid = rawOwnJid.replace(/:\d+@/, '@')
 
-        res.json({ status: 'sent', messageId: sentMsg.key.id })
+        let statusJidList
+        if (Array.isArray(bodyJidList) && bodyJidList.length > 0) {
+            statusJidList = bodyJidList.map(j => j.includes('@') ? j : `${j}@s.whatsapp.net`)
+            if (!statusJidList.includes(ownJid)) statusJidList.unshift(ownJid)
+        } else {
+            const contacts = Array.from(session.contactJids || [])
+            statusJidList = contacts.length > 0 ? contacts : (ownJid ? [ownJid] : [])
+        }
+
+        const sentMsg = await session.sock.sendMessage('status@broadcast', payload, { statusJidList })
+
+        res.json({ status: 'sent', messageId: sentMsg.key.id, recipientCount: statusJidList.length })
     } catch (error) {
         logger.error(`Controller Error (sendStatus):`, error)
         res.status(500).json({ error: error.message })

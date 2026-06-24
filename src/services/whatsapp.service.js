@@ -22,7 +22,7 @@ async function getVersion() {
 const MAX_CONNECTIONS = parseInt(process.env.MAX_WA_CONNECTIONS || '100', 10)
 let activeConnections = 0
 
-export async function createConnection(sessionId, { onQR, onStatusChange, onSocket, onLogout }, retryCount = 0) {
+export async function createConnection(sessionId, { onQR, onStatusChange, onSocket, onLogout, onContacts }, retryCount = 0) {
     if (activeConnections >= MAX_CONNECTIONS) {
         throw new Error(`Max concurrent WhatsApp connections reached (${MAX_CONNECTIONS}). Try again later.`)
     }
@@ -53,6 +53,20 @@ export async function createConnection(sessionId, { onQR, onStatusChange, onSock
     })
 
     if (onSocket) onSocket(sock)
+
+    sock.ev.on('contacts.upsert', (contacts) => {
+        const jids = contacts
+            .map(c => c.id)
+            .filter(id => id && !id.includes('@g.us') && !id.includes('@broadcast'))
+        if (jids.length && onContacts) onContacts(jids)
+    })
+
+    sock.ev.on('contacts.update', (updates) => {
+        const jids = updates
+            .map(c => c.id)
+            .filter(id => id && !id.includes('@g.us') && !id.includes('@broadcast'))
+        if (jids.length && onContacts) onContacts(jids)
+    })
 
     sock.ev.on('creds.update', saveCreds)
 

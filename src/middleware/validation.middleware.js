@@ -72,6 +72,82 @@ export const validateSendContact = validate(Joi.object({
     organization: Joi.string().max(100).optional()
 }))
 
+export const validateSendCarousel = validate(Joi.object({
+    sessionId: sessionIdSchema,
+    to: phoneSchema,
+    text: Joi.string().max(1024).optional(),
+    footer: Joi.string().max(256).optional(),
+    cards: Joi.array().items(Joi.object({
+        imageUrl: Joi.string().uri({ scheme: ['http', 'https'] }).max(2048).required(),
+        caption: Joi.string().max(1024).optional(),
+        footer: Joi.string().max(256).optional(),
+        buttons: Joi.array().items(Joi.object({
+            type: Joi.string().valid('url', 'reply', 'call', 'copy').required(),
+            displayText: Joi.string().max(50).required(),
+            url: Joi.string().uri({ scheme: ['http', 'https'] }).optional(),
+            phoneNumber: Joi.string().min(5).max(30).optional(),
+            copy: Joi.string().max(100).optional(),
+            id: Joi.string().max(50).optional()
+        })).min(1).max(2).optional()
+    })).min(2).max(10).required()
+}))
+
+export const validateSendTemplateButtons = validate(Joi.object({
+    sessionId: sessionIdSchema,
+    to: phoneSchema,
+    text: Joi.string().max(1024).required(),
+    footer: Joi.string().max(256).optional(),
+    optionText: Joi.string().max(50).optional(),
+    optionTitle: Joi.string().max(50).optional(),
+    buttons: Joi.array().items(Joi.alternatives().try(
+        Joi.object({
+            type: Joi.string().valid('url').required(),
+            displayText: Joi.string().max(50).required(),
+            url: Joi.string().uri({ scheme: ['http', 'https'] }).max(2048).required()
+        }),
+        Joi.object({
+            type: Joi.string().valid('reply').required(),
+            displayText: Joi.string().max(50).required(),
+            id: Joi.string().max(50).required()
+        }),
+        Joi.object({
+            type: Joi.string().valid('call').required(),
+            displayText: Joi.string().max(50).required(),
+            phoneNumber: Joi.string().min(5).max(30).required()
+        }),
+        Joi.object({
+            type: Joi.string().valid('copy').required(),
+            displayText: Joi.string().max(50).required(),
+            copy: Joi.string().max(100).required()
+        }),
+        Joi.object({
+            type: Joi.string().valid('list').required(),
+            displayText: Joi.string().max(50).required(),
+            sections: Joi.array().items(Joi.object({
+                title: Joi.string().max(100).required(),
+                rows: Joi.array().items(Joi.object({
+                    id: Joi.string().max(50).required(),
+                    title: Joi.string().max(100).required(),
+                    description: Joi.string().max(200).optional()
+                })).min(1).required()
+            })).min(1).required()
+        })
+    )).min(1).max(3).required()
+}))
+
+export const validateSendButtons = validate(Joi.object({
+    sessionId: sessionIdSchema,
+    to: phoneSchema,
+    text: Joi.string().max(1024).required(),
+    footer: Joi.string().max(256).optional(),
+    buttons: Joi.array().items(Joi.object({
+        buttonId: Joi.string().max(50).required(),
+        buttonText: Joi.object({
+            displayText: Joi.string().max(50).required()
+        }).required()
+    })).min(1).max(3).required()
+}))
+
 export const validateSetTyping = validate(Joi.object({
     sessionId: sessionIdSchema,
     to: phoneSchema,
@@ -124,8 +200,9 @@ export const validateSendStatus = validate(Joi.object({
     mediaType: Joi.string().valid('image', 'video', 'audio', 'text').default('text'),
     message: Joi.string().max(4096).optional(),
     caption: Joi.string().max(1024).optional(),
-    backgroundColor: Joi.string().max(20).optional(), // e.g. '#FF5733'
-    font: Joi.number().integer().min(0).max(5).optional()
+    backgroundColor: Joi.string().max(20).optional(),
+    font: Joi.number().integer().min(0).max(5).optional(),
+    statusJidList: Joi.array().items(Joi.string()).optional()
 }))
 
 export const validateDeleteStatus = validate(Joi.object({
