@@ -17,21 +17,28 @@ export const listChannels = async (req, res) => {
         if (!session) return
 
         const newsletters = await session.sock.newsletterSubscribed()
+        const list = Array.isArray(newsletters) ? newsletters : []
 
         res.json({
             status: 'success',
-            count: newsletters.length,
-            channels: newsletters.map(n => ({
-                id: n.id,
-                name: n.name,
-                description: n.description,
-                subscriberCount: n.subscribers,
-                picture: n.picture,
-                preview: n.preview,
-                verified: n.verified,
-                mute: n.mute,
-                creationTime: n.creation_time
-            }))
+            count: list.length,
+            channels: list.map(n => {
+                const meta = n.thread_metadata ?? {}
+                const viewer = n.viewer_metadata ?? {}
+                return {
+                    id: n.id,
+                    state: n.state?.type ?? null,
+                    name: meta.name?.text ?? null,
+                    description: meta.description?.text ?? null,
+                    invite: meta.invite ?? null,
+                    picture: meta.picture ?? null,
+                    preview: meta.preview?.direct_path ?? null,
+                    verified: meta.verification === 'VERIFIED',
+                    mute: viewer.mute === 'ON',
+                    role: viewer.role ?? null,
+                    creationTime: meta.creation_time ? parseInt(meta.creation_time) : null
+                }
+            })
         })
     } catch (error) {
         logger.error('Controller Error (listChannels):', error)
@@ -86,18 +93,23 @@ export const getChannelInfo = async (req, res) => {
 
         const jid = normalizeJid(channelId, 'newsletter')
         const metadata = await session.sock.newsletterMetadata('jid', jid)
+        const meta = metadata?.thread_metadata ?? metadata ?? {}
+        const viewer = metadata?.viewer_metadata ?? {}
 
         res.json({
             status: 'success',
             channel: {
-                id: metadata.id,
-                name: metadata.name,
-                description: metadata.description,
-                subscriberCount: metadata.subscribers,
-                picture: metadata.picture,
-                preview: metadata.preview,
-                verified: metadata.verified,
-                creationTime: metadata.creation_time
+                id: metadata?.id ?? jid,
+                state: metadata?.state?.type ?? null,
+                name: meta.name?.text ?? meta.name ?? null,
+                description: meta.description?.text ?? meta.description ?? null,
+                invite: meta.invite ?? null,
+                picture: meta.picture ?? null,
+                preview: meta.preview?.direct_path ?? meta.preview ?? null,
+                verified: meta.verification === 'VERIFIED',
+                mute: viewer.mute === 'ON',
+                role: viewer.role ?? null,
+                creationTime: meta.creation_time ? parseInt(meta.creation_time) : null
             }
         })
     } catch (error) {
