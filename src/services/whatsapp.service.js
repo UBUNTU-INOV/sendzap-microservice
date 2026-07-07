@@ -159,9 +159,11 @@ export async function createConnection(sessionId, { onQR, onStatusChange, onSock
             logger.debug(`Session ${sessionId}: Connection closed (${activeConnections}/${MAX_CONNECTIONS} active)`)
 
             const statusCode = lastDisconnect?.error?.output?.statusCode || lastDisconnect?.error?.code
-            const shouldReconnect = statusCode !== DisconnectReason.loggedOut && statusCode !== 401
+            const reason = lastDisconnect?.error?.message || ''
+            const isQRExpired = reason.includes('QR refs attempts ended') || reason.includes('QR timeout')
+            const shouldReconnect = !isQRExpired && statusCode !== DisconnectReason.loggedOut && statusCode !== 401
 
-            logger.warn(`Session ${sessionId}: Connection closed (${statusCode}). Reason: ${lastDisconnect?.error?.message}. Reconnecting: ${shouldReconnect}`)
+            logger.warn(`Session ${sessionId}: Connection closed (${statusCode}). Reason: ${reason}. Reconnecting: ${shouldReconnect}`)
 
             if (onStatusChange) onStatusChange(shouldReconnect ? 'reconnecting' : 'disconnected')
 
@@ -177,6 +179,9 @@ export async function createConnection(sessionId, { onQR, onStatusChange, onSock
                 setTimeout(() => {
                     createConnection(sessionId, { onQR, onStatusChange, onSocket, onLogout }, retryCount + 1)
                 }, delay)
+            } else if (isQRExpired) {
+                logger.warn(`Session ${sessionId}: QR never scanned. Deleting session from map and SQLite.`)
+                if (onLogout) onLogout()
             } else if (statusCode === DisconnectReason.loggedOut || statusCode === 401) {
                 logger.error(`Session ${sessionId}: Logged out or unauthorized. Cleaning up...`)
                 if (onLogout) onLogout()
