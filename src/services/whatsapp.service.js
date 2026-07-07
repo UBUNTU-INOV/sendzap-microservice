@@ -158,10 +158,13 @@ export async function createConnection(sessionId, { onQR, onStatusChange, onSock
             activeConnections = Math.max(0, activeConnections - 1)
             logger.debug(`Session ${sessionId}: Connection closed (${activeConnections}/${MAX_CONNECTIONS} active)`)
 
+            const MAX_RETRIES = 10
             const statusCode = lastDisconnect?.error?.output?.statusCode || lastDisconnect?.error?.code
             const reason = lastDisconnect?.error?.message || ''
             const isQRExpired = reason.includes('QR refs attempts ended') || reason.includes('QR timeout')
-            const shouldReconnect = !isQRExpired && statusCode !== DisconnectReason.loggedOut && statusCode !== 401
+            const isForbidden = statusCode === 403
+            const isLoggedOut = statusCode === DisconnectReason.loggedOut || statusCode === 401
+            const shouldReconnect = !isQRExpired && !isForbidden && !isLoggedOut && retryCount < MAX_RETRIES
 
             logger.warn(`Session ${sessionId}: Connection closed (${statusCode}). Reason: ${reason}. Reconnecting: ${shouldReconnect}`)
 
@@ -170,21 +173,25 @@ export async function createConnection(sessionId, { onQR, onStatusChange, onSock
             triggerWebhook('session.status', {
                 sessionId,
                 status: shouldReconnect ? 'reconnecting' : 'disconnected',
-                reason: lastDisconnect?.error?.message
+                reason
             })
 
             if (shouldReconnect) {
                 const delay = Math.min(Math.pow(2, retryCount) * 1000, 30000)
-                logger.info(`Session ${sessionId}: Reconnecting in ${delay}ms... (Attempt ${retryCount + 1})`)
+                logger.info(`Session ${sessionId}: Reconnecting in ${delay}ms... (Attempt ${retryCount + 1}/${MAX_RETRIES})`)
                 setTimeout(() => {
                     createConnection(sessionId, { onQR, onStatusChange, onSocket, onLogout }, retryCount + 1)
                 }, delay)
             } else if (isQRExpired) {
                 logger.warn(`Session ${sessionId}: QR never scanned. Deleting session from map and SQLite.`)
                 if (onLogout) onLogout()
-            } else if (statusCode === DisconnectReason.loggedOut || statusCode === 401) {
+            } else if (isForbidden) {
+                logger.error(`Session ${sessionId}: Forbidden by WhatsApp (403). Stopping reconnection to avoid ban.`)
+            } else if (isLoggedOut) {
                 logger.error(`Session ${sessionId}: Logged out or unauthorized. Cleaning up...`)
                 if (onLogout) onLogout()
+            } else {
+                logger.error(`Session ${sessionId}: Max reconnection attempts (${MAX_RETRIES}) reached. Stopping.`)
             }
         }
     })
