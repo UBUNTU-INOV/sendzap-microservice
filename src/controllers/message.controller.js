@@ -47,13 +47,23 @@ export const sendMessage = async (req, res) => {
 }
 
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms))
+const humanDelay = (baseMs) => {
+    const jitter = Math.floor(Math.random() * 1500)
+    return delay(Math.max(1000, baseMs) + jitter)
+}
+
+const MAX_BULK_RECEIVERS = 200
 
 export const sendBulkMessage = async (req, res) => {
     try {
-        const { sessionId, receivers, message, mediaUrl, mediaType, fileName, caption, delayMs = 1000 } = req.body
+        const { sessionId, receivers, message, mediaUrl, mediaType, fileName, caption, delayMs = 2000 } = req.body
 
         if (!receivers || !Array.isArray(receivers) || receivers.length === 0) {
             return res.status(400).json({ error: 'To send bulk messages, provide "receivers" array.' })
+        }
+
+        if (receivers.length > MAX_BULK_RECEIVERS) {
+            return res.status(400).json({ error: `Too many receivers. Max ${MAX_BULK_RECEIVERS} per request.` })
         }
 
         const session = sessionManager.getSession(sessionId)
@@ -81,7 +91,7 @@ export const sendBulkMessage = async (req, res) => {
                 results.push({ to, status: 'failed', error: err.message })
             }
             if (i < receivers.length - 1) {
-                await delay(delayMs)
+                await humanDelay(delayMs)
             }
         }
 
