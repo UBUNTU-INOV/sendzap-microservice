@@ -33,11 +33,32 @@ export async function createConnection(sessionId, { onQR, onStatusChange, onSock
     const { state, saveCreds } = await useSqliteAuthState(sessionId)
     const version = await getVersion()
 
+    // Custom logger that intercepts Baileys' internal 463 warnings.
+    // Baileys does NOT emit messages.update for 463 — it only logs them and calls issuePrivacyTokens().
+    // We hook into warn() to fire our webhook before Baileys handles the recovery.
+    const baileysLogger = Object.create(logger.child({ session: sessionId }))
+    baileysLogger.warn = (obj, msg) => {
+        const message = typeof obj === 'string' ? obj : (msg || '')
+        const isError463 = message.includes('error 463') || (typeof obj === 'object' && String(obj?.msg || '').includes('error 463'))
+        if (isError463 && typeof obj === 'object' && obj.msgId) {
+            logger.warn(`Session ${sessionId}: Message delivery failed ${obj.msgId} → error 463 (caught via Baileys logger)`)
+            triggerWebhook('message.delivery_failed', {
+                sessionId,
+                key: { id: obj.msgId, remoteJid: obj.from ?? null },
+                errorCode: 463,
+                reason: 'account_restricted_or_missing_tctoken',
+                autoRecovering: true
+            })
+        } else {
+            logger.warn({ session: sessionId, ...( typeof obj === 'object' ? obj : {}) }, message)
+        }
+    }
+
     const sock = makeWASocket({
         version,
         auth: state,
         printQRInTerminal: false,
-        logger: logger.child({ session: sessionId, level: 'silent' }),
+        logger: baileysLogger,
         browser: ['SendZap', 'Chrome', '2.1'],
         // Memory optimizations — critical for 100+ sessions
         syncFullHistory: false,
