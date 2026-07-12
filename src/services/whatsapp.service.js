@@ -174,20 +174,16 @@ export async function createConnection(sessionId, { onQR, onStatusChange, onSock
                 const errorCode = update.update.messageStubParameters?.[0]
 
                 if (isError) {
-                    // 463 = missing tcToken / account restricted (Baileys auto-issues token after this)
-                    // 479 = smax-invalid stanza
+                    // 463 is already handled by the baileysLogger.warn() interceptor above — skip to avoid double webhook
+                    if (errorCode === '463') continue
+                    // 479 = smax-invalid stanza (newsletter media rejected)
                     logger.warn(`Session ${sessionId}: Message delivery failed ${update.key.id} → error ${errorCode}`)
                     triggerWebhook('message.delivery_failed', {
                         sessionId,
                         key: update.key,
                         errorCode: errorCode ? parseInt(errorCode) : null,
-                        reason: errorCode === '463'
-                            ? 'account_restricted_or_missing_tctoken'
-                            : errorCode === '479'
-                                ? 'stanza_rejected'
-                                : 'unknown',
-                        // Baileys auto-retries tcToken issuance after 463 — next message to same contact may work
-                        autoRecovering: errorCode === '463'
+                        reason: errorCode === '479' ? 'stanza_rejected' : 'unknown',
+                        autoRecovering: false
                     })
                 } else {
                     logger.info(`Session ${sessionId}: Message status ${update.key.id}: ${update.update.status}`)
