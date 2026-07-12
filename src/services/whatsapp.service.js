@@ -146,14 +146,37 @@ export async function createConnection(sessionId, { onQR, onStatusChange, onSock
     sock.ev.on('messages.update', (updates) => {
         for (const update of updates) {
             try {
-                if (!update.update.status) continue
-                logger.info(`Session ${sessionId}: Message status ${update.key.id}: ${update.update.status}`)
-                triggerWebhook('message.update', {
-                    sessionId,
-                    key: update.key,
-                    status: update.update.status,
-                    timestamp: update.update.messageTimestamp
-                })
+                // WAMessageStatus.ERROR = 0 is falsy — must check undefined explicitly
+                if (update.update.status === undefined && !update.update.messageStubParameters) continue
+
+                const isError = update.update.status === 0
+                const errorCode = update.update.messageStubParameters?.[0]
+
+                if (isError) {
+                    // 463 = missing tcToken / account restricted (Baileys auto-issues token after this)
+                    // 479 = smax-invalid stanza
+                    logger.warn(`Session ${sessionId}: Message delivery failed ${update.key.id} → error ${errorCode}`)
+                    triggerWebhook('message.delivery_failed', {
+                        sessionId,
+                        key: update.key,
+                        errorCode: errorCode ? parseInt(errorCode) : null,
+                        reason: errorCode === '463'
+                            ? 'account_restricted_or_missing_tctoken'
+                            : errorCode === '479'
+                                ? 'stanza_rejected'
+                                : 'unknown',
+                        // Baileys auto-retries tcToken issuance after 463 — next message to same contact may work
+                        autoRecovering: errorCode === '463'
+                    })
+                } else {
+                    logger.info(`Session ${sessionId}: Message status ${update.key.id}: ${update.update.status}`)
+                    triggerWebhook('message.update', {
+                        sessionId,
+                        key: update.key,
+                        status: update.update.status,
+                        timestamp: update.update.messageTimestamp
+                    })
+                }
             } catch (err) {
                 logger.error(`Session ${sessionId}: Error processing message.update event:`, err)
             }
