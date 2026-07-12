@@ -2,7 +2,7 @@ import crypto from 'crypto'
 import logger from '../config/logger.js'
 
 export const authMiddleware = (req, res, next) => {
-    if (req.path === '/api-docs' || req.path.startsWith('/api-docs/') || req.path === '/health') {
+    if (req.path === '/api-docs' || req.path.startsWith('/api-docs/') || req.path === '/health' || req.path === '/test-ui') {
         return next()
     }
 

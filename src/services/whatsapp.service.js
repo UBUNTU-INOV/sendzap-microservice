@@ -52,6 +52,28 @@ export async function createConnection(sessionId, { onQR, onStatusChange, onSock
         getMessage: async () => undefined,
     })
 
+    // Patch newsletterCreate — WhatsApp changed the response key from xwa2_newsletter_create
+    // to xwa2_notify_newsletter_on_join (null for the old key), causing Baileys to crash.
+    sock.newsletterCreate = async (name, description) => {
+        const result = await sock.query({
+            tag: 'iq',
+            attrs: { id: sock.generateMessageTag(), type: 'get', to: 's.whatsapp.net', xmlns: 'w:mex' },
+            content: [{
+                tag: 'query',
+                attrs: { query_id: '8823471724422422' },
+                content: Buffer.from(JSON.stringify({ variables: { input: { name, description: description ?? null } } }), 'utf-8')
+            }]
+        })
+        const child = result?.content?.find?.(n => n?.tag === 'result')
+        if (!child?.content) throw new Error('newsletterCreate: no result node in response')
+        const data = JSON.parse(child.content.toString())
+        if (data.errors?.length) throw new Error(data.errors.map(e => e.message).join(', '))
+        const nl = data?.data?.xwa2_newsletter_create ?? data?.data?.xwa2_notify_newsletter_on_join
+        if (!nl?.id) throw new Error('newsletterCreate: no channel ID in response')
+        const meta = nl.thread_metadata ?? nl
+        return { id: nl.id, name: meta.name?.text ?? name, description: meta.description?.text ?? (description || ''), invite: meta.invite ?? null }
+    }
+
     if (onSocket) onSocket(sock)
 
     sock.ev.on('contacts.upsert', (contacts) => {

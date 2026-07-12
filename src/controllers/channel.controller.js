@@ -47,6 +47,15 @@ export const sendChannelMessage = async (req, res) => {
         }
 
         const jid = normalizeJid(channelId, 'newsletter')
+
+        // Subscribe to live updates before sending media — required by WhatsApp Web protocol
+        if (mediaUrl) {
+            try {
+                await session.sock.subscribeNewsletterUpdates(jid)
+            } catch (_) {}
+            await new Promise(r => setTimeout(r, 1500))
+        }
+
         const sentMsg = await session.sock.sendMessage(jid, payload)
 
         res.json({ status: 'sent', messageId: sentMsg.key.id })

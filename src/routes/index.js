@@ -44,7 +44,9 @@ router.get('/sessions', sessionController.listSessions)
 router.post('/session/:id', validateSessionId, sessionController.createOrGetSession)
 router.get('/session/:id', validateSessionId, sessionController.getSessionStatus)
 router.get('/session/:id/qr', validateSessionId, sessionController.getQRImage)
+router.post('/session/:id/pairing-code', validateSessionId, sessionController.requestPairingCode)
 router.delete('/session/:id', validateSessionId, sessionController.deleteSession)
+router.get('/test-ui', sessionController.serveTestUI)
 
 // Message & Contact routes
 router.post('/send', validateSendMessage, messageLimiter, messageController.sendMessage)
