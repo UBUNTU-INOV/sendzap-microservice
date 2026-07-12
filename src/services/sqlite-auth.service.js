@@ -1,5 +1,5 @@
 import Database from 'better-sqlite3'
-import { BufferJSON, initAuthCreds, proto } from '@itsliaaa/baileys'
+import { BufferJSON, initAuthCreds, proto } from '@whiskeysockets/baileys'
 import { existsSync, mkdirSync, readFileSync } from 'fs'
 import { resolve, join } from 'path'
 import logger from '../config/logger.js'

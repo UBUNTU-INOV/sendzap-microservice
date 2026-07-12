@@ -14,9 +14,6 @@ import {
     validateSendBulk,
     validateCheckNumber,
     validateSendContact,
-    validateSendButtons,
-    validateSendCarousel,
-    validateSendTemplateButtons,
     validateSetTyping,
     validateListGroupsOrContacts,
     validateGroupParticipants,
@@ -56,9 +53,6 @@ router.get('/groups/:sessionId', validateListGroupsOrContacts, messageController
 router.get('/contacts/:sessionId', validateListGroupsOrContacts, messageController.listContacts)
 router.post('/check-number', validateCheckNumber, checkNumberLimiter, messageController.checkNumber)
 router.post('/send-contact', validateSendContact, messageLimiter, messageController.sendContact)
-router.post('/send-carousel', validateSendCarousel, messageLimiter, messageController.sendCarousel)
-router.post('/send-buttons', validateSendButtons, messageLimiter, messageController.sendButtons)
-router.post('/send-template-buttons', validateSendTemplateButtons, messageLimiter, messageController.sendTemplateButtons)
 router.post('/set-typing', validateSetTyping, messageController.setTyping)
 
 // Group management routes

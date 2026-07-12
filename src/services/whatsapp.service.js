@@ -2,7 +2,7 @@ import makeWASocket, {
     useMultiFileAuthState,
     DisconnectReason,
     fetchLatestBaileysVersion
-} from '@itsliaaa/baileys'
+} from '@whiskeysockets/baileys'
 import { useSqliteAuthState } from './sqlite-auth.service.js'
 import logger from '../config/logger.js'
 import { triggerWebhook } from './webhook.service.js'
