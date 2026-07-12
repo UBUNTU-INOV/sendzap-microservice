@@ -12,38 +12,9 @@ function getConnectedSession(sessionId, res) {
 }
 
 export const listChannels = async (req, res) => {
-    try {
-        const session = getConnectedSession(req.params.sessionId, res)
-        if (!session) return
-
-        const newsletters = await session.sock.newsletterSubscribed()
-        const list = Array.isArray(newsletters) ? newsletters : []
-
-        res.json({
-            status: 'success',
-            count: list.length,
-            channels: list.map(n => {
-                const meta = n.thread_metadata ?? {}
-                const viewer = n.viewer_metadata ?? {}
-                return {
-                    id: n.id,
-                    state: n.state?.type ?? null,
-                    name: meta.name?.text ?? null,
-                    description: meta.description?.text ?? null,
-                    invite: meta.invite ?? null,
-                    picture: meta.picture ?? null,
-                    preview: meta.preview?.direct_path ?? null,
-                    verified: meta.verification === 'VERIFIED',
-                    mute: viewer.mute === 'ON',
-                    role: viewer.role ?? null,
-                    creationTime: meta.creation_time ? parseInt(meta.creation_time) : null
-                }
-            })
-        })
-    } catch (error) {
-        logger.error('Controller Error (listChannels):', error)
-        res.status(500).json({ error: error.message })
-    }
+    res.status(501).json({
+        error: 'listChannels is not supported. Use GET /channels/info/:sessionId/:channelId with a specific channel JID instead.'
+    })
 }
 
 export const createChannel = async (req, res) => {
