@@ -190,6 +190,104 @@ export const sendContact = async (req, res) => {
     }
 }
 
+export const sendTemplateButtons = async (req, res) => {
+    try {
+        const { sessionId, to, text, buttons, footer, optionText, optionTitle, imageUrl } = req.body
+        const session = sessionManager.getSession(sessionId)
+
+        if (!session || session.status !== 'connected') {
+            return res.status(400).json({ error: 'Session not found or not connected' })
+        }
+
+        const nativeFlow = buttons.map(b => {
+            if (b.type === 'url')  return { text: b.displayText, url: b.url }
+            if (b.type === 'call') return { text: b.displayText, call: b.phoneNumber }
+            if (b.type === 'copy') return { text: b.displayText, copy: b.copy }
+            if (b.type === 'list') return { text: b.displayText, sections: b.sections }
+            return { text: b.displayText, id: b.id }
+        })
+
+        const jid = normalizeJid(to, 'private')
+        const payload = imageUrl
+            ? { image: { url: imageUrl }, caption: text, footer: footer ?? '', nativeFlow }
+            : { text, footer: footer ?? '', nativeFlow }
+        if (optionText) {
+            payload.optionText = optionText
+            payload.optionTitle = optionTitle || 'Options'
+        }
+
+        const sentMsg = await session.sock.sendMessage(jid, payload)
+        res.json({ status: 'sent', messageId: sentMsg.key.id })
+    } catch (error) {
+        logger.error('Controller Error (sendTemplateButtons):', error)
+        res.status(500).json({ error: error.message })
+    }
+}
+
+export const sendCarousel = async (req, res) => {
+    try {
+        const { sessionId, to, text, footer, cards } = req.body
+        const session = sessionManager.getSession(sessionId)
+
+        if (!session || session.status !== 'connected') {
+            return res.status(400).json({ error: 'Session not found or not connected' })
+        }
+
+        const formattedCards = cards.map(card => {
+            const c = {
+                image: { url: card.imageUrl },
+                caption: card.caption || '',
+                footer: card.footer || ''
+            }
+            if (card.buttons && Array.isArray(card.buttons)) {
+                c.nativeFlow = card.buttons.map(b => {
+                    if (b.type === 'url')  return { text: b.displayText, url: b.url }
+                    if (b.type === 'call') return { text: b.displayText, call: b.phoneNumber }
+                    if (b.type === 'copy') return { text: b.displayText, copy: b.copy }
+                    return { text: b.displayText, id: b.id }
+                })
+            }
+            return c
+        })
+
+        const jid = normalizeJid(to, 'private')
+        const sentMsg = await session.sock.sendMessage(jid, {
+            text: text || '',
+            footer: footer || '',
+            cards: formattedCards
+        })
+
+        res.json({ status: 'sent', messageId: sentMsg.key.id })
+    } catch (error) {
+        logger.error('Controller Error (sendCarousel):', error)
+        res.status(500).json({ error: error.message })
+    }
+}
+
+export const sendButtons = async (req, res) => {
+    try {
+        const { sessionId, to, text, buttons, footer } = req.body
+        const session = sessionManager.getSession(sessionId)
+
+        if (!session || session.status !== 'connected') {
+            return res.status(400).json({ error: 'Session not found or not connected' })
+        }
+
+        const jid = normalizeJid(to, 'private')
+        const sentMsg = await session.sock.sendMessage(jid, {
+            text,
+            footer: footer ?? '',
+            buttons: buttons.map(b => ({ ...b, type: 1 })),
+            headerType: 1
+        })
+
+        res.json({ status: 'sent', messageId: sentMsg.key.id })
+    } catch (error) {
+        logger.error('Controller Error (sendButtons):', error)
+        res.status(500).json({ error: error.message })
+    }
+}
+
 export const setTyping = async (req, res) => {
     try {
         const { sessionId, to, presence } = req.body

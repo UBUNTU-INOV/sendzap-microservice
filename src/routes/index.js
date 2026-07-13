@@ -27,6 +27,9 @@ import {
     validateGroupCreate,
     validateGroupMetadata,
     validateGroupLeave,
+    validateSendButtons,
+    validateSendTemplateButtons,
+    validateSendCarousel,
     validateChannelList,
     validateChannelCreate,
     validateChannelSend,
@@ -56,6 +59,9 @@ router.get('/contacts/:sessionId', validateListGroupsOrContacts, messageControll
 router.post('/check-number', validateCheckNumber, checkNumberLimiter, messageController.checkNumber)
 router.post('/send-contact', validateSendContact, messageLimiter, messageController.sendContact)
 router.post('/set-typing', validateSetTyping, messageController.setTyping)
+router.post('/send-buttons', validateSendButtons, messageLimiter, messageController.sendButtons)
+router.post('/send-template-buttons', validateSendTemplateButtons, messageLimiter, messageController.sendTemplateButtons)
+router.post('/send-carousel', validateSendCarousel, messageLimiter, messageController.sendCarousel)
 
 // Group management routes
 router.post('/groups/participants/update', validateGroupParticipants, groupController.updateParticipants)

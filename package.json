@@ -13,7 +13,7 @@
   "description": "",
   "type": "module",
   "dependencies": {
-    "@whiskeysockets/baileys": "^7.0.0-rc13",
+    "@itsliaaa/baileys": "^0.3.17",
     "axios": "^1.13.2",
     "better-sqlite3": "^12.6.2",
     "dotenv": "^17.2.3",
