@@ -97,17 +97,27 @@ export async function createConnection(sessionId, { onQR, onStatusChange, onSock
 
     if (onSocket) onSocket(sock)
 
+    const isIndividualJid = (id) => id && !id.endsWith('@g.us') && !id.endsWith('@broadcast') && !id.endsWith('@newsletter') && !id.endsWith('@lid')
+
     sock.ev.on('contacts.upsert', (contacts) => {
-        const jids = contacts
-            .map(c => c.id)
-            .filter(id => id && !id.includes('@g.us') && !id.includes('@broadcast'))
+        const jids = contacts.map(c => c.id).filter(isIndividualJid)
         if (jids.length && onContacts) onContacts(jids)
     })
 
     sock.ev.on('contacts.update', (updates) => {
-        const jids = updates
-            .map(c => c.id)
-            .filter(id => id && !id.includes('@g.us') && !id.includes('@broadcast'))
+        const jids = updates.map(c => c.id).filter(isIndividualJid)
+        if (jids.length && onContacts) onContacts(jids)
+    })
+
+    // chats.upsert fires on connect with the full conversation list —
+    // these are people the instance has actually chatted with (warm contacts)
+    sock.ev.on('chats.upsert', (chats) => {
+        const jids = chats.map(c => c.id).filter(isIndividualJid)
+        if (jids.length && onContacts) onContacts(jids)
+    })
+
+    sock.ev.on('chats.update', (chats) => {
+        const jids = chats.map(c => c.id).filter(isIndividualJid)
         if (jids.length && onContacts) onContacts(jids)
     })
 

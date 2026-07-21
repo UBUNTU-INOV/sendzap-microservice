@@ -172,7 +172,6 @@ export async function getGroups(sessionId) {
 
 export async function getContacts(sessionId) {
     const session = sessions.get(sessionId)
-    if (!session || !session.sock) return []
-    // Placeholder for contacts fetching (requires a Store implementation for full details)
-    return []
+    if (!session) return []
+    return Array.from(session.contactJids).map(jid => ({ id: jid }))
 }
