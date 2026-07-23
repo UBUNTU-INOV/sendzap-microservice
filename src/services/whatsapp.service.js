@@ -223,7 +223,8 @@ export async function createConnection(sessionId, { onQR, onStatusChange, onSock
             logger.info(`Session ${sessionId}: Connected`)
             if (onStatusChange) onStatusChange('connected')
             retryCount = 0
-            triggerWebhook('session.status', { sessionId, status: 'connected' })
+            const phone = sock.user?.id?.split('@')[0] ?? null
+            triggerWebhook('session.status', { sessionId, status: 'connected', phone })
         }
 
         if (connection === 'close') {
