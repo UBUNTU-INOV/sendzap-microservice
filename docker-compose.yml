@@ -3,8 +3,8 @@ version: '3.8'
 services:
   whatsapp-api:
     build: .
-    ports:
-      - "${PORT:-3000}:3000"
+    expose:
+      - "3000"
     mem_limit: 4g
     mem_reservation: 2g
     environment:
@@ -17,10 +17,6 @@ services:
       - MAX_WA_CONNECTIONS=${MAX_WA_CONNECTIONS:-120}
       - MAX_WEBHOOK_QUEUE=${MAX_WEBHOOK_QUEUE:-15000}
     volumes:
-      # Named volume — persists across redeployments, image rebuilds, and container restarts.
-      # Docker never deletes named volumes automatically (unlike bind mounts).
-      # On Coolify: configure a Persistent Storage pointing to /app/sessions in the UI,
-      # OR keep this named volume — Coolify respects docker-compose volumes.
       - sessions_data:/app/sessions
     restart: always
     healthcheck:
@@ -29,7 +25,8 @@ services:
       timeout: 10s
       retries: 3
       start_period: 15s
+    labels:
+      - "caddy_0.reverse_proxy={{upstreams 3000}}"
 
-# Named volume managed by Docker — survives container recreation and redeployments
 volumes:
   sessions_data:
