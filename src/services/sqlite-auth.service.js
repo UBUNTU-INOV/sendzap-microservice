@@ -4,6 +4,8 @@ import { existsSync, mkdirSync, readFileSync } from 'fs'
 import { resolve, join } from 'path'
 import logger from '../config/logger.js'
 
+const SESSIONS_DIR = './sessions'
+
 // Validates sessionId and returns a safe resolved path — throws if traversal detected
 function safeSessionPath(sessionId) {
     if (!sessionId || !/^[a-zA-Z0-9_-]+$/.test(sessionId)) {
@@ -16,8 +18,6 @@ function safeSessionPath(sessionId) {
     }
     return full
 }
-
-const SESSIONS_DIR = './sessions'
 if (!existsSync(SESSIONS_DIR)) {
     mkdirSync(SESSIONS_DIR)
 }
@@ -121,8 +121,8 @@ export const useSqliteAuthState = async (sessionId) => {
                     return data
                 },
                 set: async (data) => {
-                    for (const type in data) {
-                        for (const id in data[type]) {
+                    for (const type of Object.keys(data)) {
+                        for (const id of Object.keys(data[type])) {
                             const value = data[type][id]
                             if (value) {
                                 writeData(value, type, id)

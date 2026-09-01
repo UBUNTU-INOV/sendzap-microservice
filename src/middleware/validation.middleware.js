@@ -49,7 +49,7 @@ export const validateSendMessage = validate(Joi.object({
 
 export const validateSendBulk = validate(Joi.object({
     sessionId: sessionIdSchema,
-    receivers: Joi.array().items(phoneSchema).min(1).max(500).required(),
+    receivers: Joi.array().items(phoneSchema).min(1).max(200).required(),
     message: Joi.string().allow('').max(4096).optional(),
     mediaUrl: mediaUrlSchema,
     mediaType: Joi.string().valid('image', 'video', 'audio', 'document').optional(),

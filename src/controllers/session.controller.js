@@ -98,7 +98,6 @@ export const requestPairingCode = async (req, res) => {
 }
 
 export const serveTestUI = (req, res) => {
-    const apiKey = process.env.API_KEY || ''
     const html = `<!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -191,7 +190,7 @@ button:disabled{opacity:.4;cursor:not-allowed}
 
 <script>
 const SESSION_ID = 'test-22994831275'
-const API_KEY = '${apiKey}'
+const API_KEY = ''  // Enter your X-API-KEY here for local testing
 const BASE = ''
 
 let qrRefreshTimer = null

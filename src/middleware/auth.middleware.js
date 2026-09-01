@@ -6,7 +6,7 @@ export const authMiddleware = (req, res, next) => {
         return next()
     }
 
-    const apiKey = req.headers['x-api-key'] || req.query.api_key
+    const apiKey = req.headers['x-api-key']
     const validApiKey = process.env.API_KEY
 
     if (!validApiKey) {
