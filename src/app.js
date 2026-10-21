@@ -6,7 +6,8 @@ import { authMiddleware } from './middleware/auth.middleware.js'
 import { globalLimiter } from './middleware/rate-limit.middleware.js'
 
 import swaggerUi from 'swagger-ui-express'
-import YAML from 'yamljs'
+import { load as loadYaml } from 'js-yaml'
+import fs from 'fs'
 
 const app = express()
 
@@ -23,7 +24,7 @@ app.use(authMiddleware)
 
 app.use('/', routes)
 
-const swaggerDocument = YAML.load('./swagger.yaml')
+const swaggerDocument = loadYaml(fs.readFileSync('./swagger.yaml', 'utf8'))
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument))
 
 app.use((err, req, res, next) => {
