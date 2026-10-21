@@ -7,13 +7,44 @@ import { useSqliteAuthState } from './sqlite-auth.service.js'
 import logger from '../config/logger.js'
 import { triggerWebhook } from './webhook.service.js'
 
-// Fetch once per process lifetime to avoid redundant network calls on reconnections
+// Last known-good WA-Web version (checked 2026-10-21) — used only if every
+// remote lookup below fails. Baileys rejects a stale version with a 405
+// "client_too_old" disconnect on every connection attempt, so this must
+// track reality, not just compile.
+const FALLBACK_WA_VERSION = [2, 3000, 1043857760]
+
+// Fetch once per process lifetime to avoid redundant network calls on reconnections.
+// The @itsliaaa/baileys fork's own version-lookup repo (fetchLatestBaileysVersion) has
+// lagged behind WhatsApp's actual protocol before (confirmed 2026-10-21: it served
+// 2.3000.1041589577 while WhatsApp already required 2.3000.1043857760, rejecting every
+// connection with 405). WhiskeySockets/Baileys — the actively maintained upstream — is
+// checked first since it tracks WhatsApp's rollouts more closely; the fork's own lookup
+// is only a fallback.
 let cachedVersion = null
+async function fetchWhiskeySocketsVersion() {
+    const res = await fetch('https://raw.githubusercontent.com/WhiskeySockets/Baileys/master/src/Defaults/baileys-version.json')
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    const { version } = await res.json()
+    return version
+}
 async function getVersion() {
     if (!cachedVersion) {
-        const { version, isLatest } = await fetchLatestBaileysVersion()
-        cachedVersion = version
-        logger.info(`Baileys version: ${version.join('.')}, isLatest: ${isLatest}`)
+        try {
+            cachedVersion = await fetchWhiskeySocketsVersion()
+            logger.info(`Baileys version (WhiskeySockets): ${cachedVersion.join('.')}`)
+            return cachedVersion
+        } catch (err) {
+            logger.warn(`WhiskeySockets version lookup failed (${err.message}), falling back…`)
+        }
+
+        try {
+            const { version, isLatest } = await fetchLatestBaileysVersion()
+            cachedVersion = version
+            logger.info(`Baileys version: ${version.join('.')}, isLatest: ${isLatest}`)
+        } catch (err) {
+            logger.warn(`Fork version lookup also failed (${err.message}), using hardcoded fallback.`)
+            cachedVersion = FALLBACK_WA_VERSION
+        }
     }
     return cachedVersion
 }
