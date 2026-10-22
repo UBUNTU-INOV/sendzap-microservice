@@ -1,4 +1,7 @@
-FROM node:22-alpine
+# Tag figé (était node:22-alpine, flottant) — Node 22 LTS, dernier patch au 2026-10-22.
+# Reproductibilité totale : après `docker pull`, remplacer par le digest
+# FROM node:22.23.4-alpine@sha256:<digest obtenu sur le build host>
+FROM node:22.23.4-alpine
 
 WORKDIR /app
 
