@@ -86,6 +86,7 @@ router.get('/channels/:sessionId', validateChannelList, channelController.listCh
 router.post('/channels/create', validateChannelCreate, channelController.createChannel)
 router.post('/channels/send', validateChannelSend, messageLimiter, channelController.sendChannelMessage)
 router.get('/channels/info/:sessionId/:channelId', validateChannelInfo, channelController.getChannelInfo)
+router.get('/channels/messages/:sessionId/:channelId', validateChannelInfo, channelController.getChannelMessages)
 router.post('/channels/follow', validateChannelFollow, channelController.followChannel)
 router.post('/channels/unfollow', validateChannelFollow, channelController.unfollowChannel)
 router.post('/channels/mute', validateChannelMute, channelController.muteChannel)

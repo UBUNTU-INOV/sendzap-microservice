@@ -1,3 +1,4 @@
+import { proto, getBinaryNodeChild, getBinaryNodeChildren, S_WHATSAPP_NET } from '@itsliaaa/baileys'
 import * as sessionManager from '../services/session.manager.js'
 import { normalizeJid, buildMediaPayload, buildChannelInteractivePayload } from '../utils/whatsapp.utils.js'
 import logger from '../config/logger.js'
@@ -81,6 +82,52 @@ export const sendChannelMessage = async (req, res) => {
         res.json({ status: 'sent', messageId: sentMsg.key.id })
     } catch (error) {
         logger.error('Controller Error (sendChannelMessage):', error)
+        res.status(500).json({ error: error.message })
+    }
+}
+
+/**
+ * Latest posts of a channel exactly as WhatsApp stores them: the <message>
+ * stanza attributes, its child nodes and the decoded content. Baileys'
+ * newsletterFetchMessages keeps only the content, but what makes a post a
+ * real question (one whose answers reach the admins) may live in the stanza.
+ */
+const describeNode = (node) => ({
+    tag: node.tag,
+    attrs: node.attrs,
+    children: Array.isArray(node.content) ? node.content.map(describeNode) : undefined
+})
+
+export const getChannelMessages = async (req, res) => {
+    try {
+        const { sessionId, channelId } = req.params
+        const session = getConnectedSession(sessionId, res)
+        if (!session) return
+
+        const jid = normalizeJid(channelId, 'newsletter')
+        const count = Math.min(parseInt(req.query.count, 10) || 10, 50)
+        const result = await session.sock.query({
+            tag: 'iq',
+            attrs: { id: session.sock.generateMessageTag(), type: 'get', xmlns: 'newsletter', to: S_WHATSAPP_NET },
+            content: [{ tag: 'messages', attrs: { count: count.toString(), type: 'jid', jid } }]
+        })
+
+        const messages = getBinaryNodeChildren(getBinaryNodeChild(result, 'messages'), 'message').map(node => {
+            const plaintext = getBinaryNodeChild(node, 'plaintext')
+            let message = null
+            if (plaintext?.content) {
+                try {
+                    message = proto.Message.decode(Buffer.from(plaintext.content)).toJSON()
+                } catch (e) {
+                    message = { decodeError: e.message }
+                }
+            }
+            return { stanza: describeNode({ ...node, content: (node.content || []).filter(c => c.tag !== 'plaintext') }), message }
+        })
+
+        res.json({ status: 'success', channelId: jid, messages })
+    } catch (error) {
+        logger.error('Controller Error (getChannelMessages):', error)
         res.status(500).json({ error: error.message })
     }
 }
