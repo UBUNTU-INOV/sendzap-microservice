@@ -59,7 +59,14 @@ export function buildChannelInteractivePayload({ poll, question, message }) {
         }
     }
     if (question) {
-        return { raw: true, questionMessage: { message: { extendedTextMessage: { text: message } } } }
+        // The "Répondre" button needs the isQuestion flag on the message itself,
+        // the questionMessage wrapper alone shows a plain text post.
+        return {
+            raw: true,
+            questionMessage: {
+                message: { extendedTextMessage: { text: message, contextInfo: { isQuestion: true } } }
+            }
+        }
     }
     return null
 }
