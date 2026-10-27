@@ -902,6 +902,26 @@ paths:
                   enum: [image, video, audio, document]
                 caption:
                   type: string
+                poll:
+                  type: object
+                  description: Poll followers vote on. With correctAnswer it becomes a quiz (channels only).
+                  properties:
+                    name:
+                      type: string
+                    options:
+                      type: array
+                      minItems: 2
+                      maxItems: 12
+                      items:
+                        type: string
+                    selectableCount:
+                      type: integer
+                      default: 1
+                    correctAnswer:
+                      type: string
+                question:
+                  type: boolean
+                  description: Send `message` as a question followers can answer with "Reply" (answers reach the admins privately).
       responses:
         '200':
           description: Message sent to channel

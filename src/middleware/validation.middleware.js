@@ -219,8 +219,16 @@ export const validateChannelSend = validate(Joi.object({
     mediaUrl: mediaUrlSchema,
     mediaType: Joi.string().valid('image', 'video', 'audio', 'document').optional(),
     caption: Joi.string().max(1024).optional(),
-    fileName: Joi.string().max(255).optional()
-}).or('message', 'mediaUrl'))
+    fileName: Joi.string().max(255).optional(),
+    poll: Joi.object({
+        name: Joi.string().max(255).required(),
+        options: Joi.array().items(Joi.string().max(100)).min(2).max(12).unique().required(),
+        selectableCount: Joi.number().integer().min(0).optional(),
+        correctAnswer: Joi.string().max(100).optional()
+    }).optional(),
+    question: Joi.boolean().optional()
+}).or('message', 'mediaUrl', 'poll')
+  .with('question', 'message'))
 
 export const validateChannelInfo = validate(Joi.object({
     sessionId: sessionIdSchema,

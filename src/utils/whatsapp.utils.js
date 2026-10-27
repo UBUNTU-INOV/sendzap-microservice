@@ -38,3 +38,29 @@ export function buildMediaPayload({ message, mediaUrl, mediaType, fileName, capt
         default:         return null
     }
 }
+
+/**
+ * Channel-only interactive content.
+ * - poll: followers vote (single choice by default); with `correctAnswer`
+ *   it becomes a quiz, a format WhatsApp only offers in channels.
+ * - question: a text followers can answer with "Répondre"; answers reach the
+ *   admins privately. Baileys has no helper for it, so it goes out as a raw
+ *   questionMessage.
+ */
+export function buildChannelInteractivePayload({ poll, question, message }) {
+    if (poll) {
+        return {
+            poll: {
+                name: poll.name,
+                values: poll.options,
+                selectableCount: poll.selectableCount ?? 1,
+                ...(poll.correctAnswer ? { pollType: 1, correctAnswer: poll.correctAnswer } : {})
+            }
+        }
+    }
+    if (question) {
+        return { raw: true, questionMessage: { message: { extendedTextMessage: { text: message } } } }
+    }
+    return null
+}
+

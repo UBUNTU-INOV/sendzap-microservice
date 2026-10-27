@@ -1,5 +1,5 @@
 import * as sessionManager from '../services/session.manager.js'
-import { normalizeJid, buildMediaPayload } from '../utils/whatsapp.utils.js'
+import { normalizeJid, buildMediaPayload, buildChannelInteractivePayload } from '../utils/whatsapp.utils.js'
 import logger from '../config/logger.js'
 
 function getConnectedSession(sessionId, res) {
@@ -56,11 +56,12 @@ export const createChannel = async (req, res) => {
 
 export const sendChannelMessage = async (req, res) => {
     try {
-        const { sessionId, channelId, message, mediaUrl, mediaType, caption, fileName } = req.body
+        const { sessionId, channelId, message, mediaUrl, mediaType, caption, fileName, poll, question } = req.body
         const session = getConnectedSession(sessionId, res)
         if (!session) return
 
-        const payload = buildMediaPayload({ message, mediaUrl, mediaType, caption, fileName })
+        const payload = buildChannelInteractivePayload({ poll, question, message })
+            ?? buildMediaPayload({ message, mediaUrl, mediaType, caption, fileName })
         if (!payload) {
             return res.status(400).json({ error: 'Invalid mediaType. Use image, video, audio, or document.' })
         }
